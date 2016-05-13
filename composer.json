@@ -1,0 +1,11 @@
+{
+  "name": "benjaminmedia/wp-grab-image",
+  "type": "wordpress-plugin",
+  "homepage": "https://github.com/BenjaminMedia/wp-grab-image",
+  "license": "GPLv3",
+  "description": "WordPress which grabs images of img tags and reuploads them to be located on the site",
+  "keywords": ["plugin"],
+  "require": {
+    "composer/installers": "~1.0.6"
+  }
+}
