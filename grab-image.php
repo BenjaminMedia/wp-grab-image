@@ -1,9 +1,9 @@
 <?php
 /* Plugin Name: grab-image
- * Version: 0.1-alpha
- * Description: PLUGIN DESCRIPTION HERE
- * Author: YOUR NAME HERE
- * Author URI: YOUR SITE HERE
+ * Version: 0.1
+ * Description: Grabs images of img tags are reuploads them to be located on the site.
+ * Author: Niteco
+ * Author URI: http://niteco.se/
  * Plugin URI: PLUGIN SITE HERE
  * Text Domain: grab-image
  * Domain Path: /languages
