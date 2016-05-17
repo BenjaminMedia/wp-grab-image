@@ -13,7 +13,7 @@
 define('ALLOW_UNFILTERED_UPLOADS', true);
 
 // no limit time
-ini_set('max_execution_time', 0);
+ini_set('max_execution_time', 300);
 
 // Start up the engine
 add_action('admin_menu', 'grab_image_page');
@@ -36,8 +36,10 @@ function reencode_url($url) {
 
 function clean_filename($file) {
     $path = pathinfo($file);
-    $new_filename = preg_replace('/.' . $path['extension'] . '$/', '', $file);
-    $file = sanitize_title($new_filename) . '.' . $path['extension'];
+    if (isset($path['extension'])) {
+        $new_filename = preg_replace('/.' . $path['extension'] . '$/', '', $file);
+        $file = sanitize_title($new_filename) . '.' . $path['extension'];
+    }
 
     return $file;
 }
@@ -228,12 +230,15 @@ function grab_image_run() {
                                         url: ajaxurl,
                                         cache: false,
                                         data: data,
+                                        method: 'POST',
                                         success: function(msg) {
                                             jQuery('#image-' + id).html(msg);
                                             doNext();
                                         },
                                         error: function (msg) {
                                             jQuery('#image-' + id).html('Error ...');
+                                            --index;
+                                            setTimeout(doNext, 3000);
                                         }
                                     });
                                 }
