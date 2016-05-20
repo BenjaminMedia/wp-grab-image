@@ -1,13 +1,14 @@
 <?php
-/* Plugin Name: grab-image
- * Version: 0.1
- * Description: Grabs images of img tags are reuploads them to be located on the site.
+/**
+ * @package grab-image
+ * Plugin Name: grab-image
+ * Version: 0.2
+ * Description: Grabs images of img tags are re-uploads them to be located on the site.
  * Author: Niteco
  * Author URI: http://niteco.se/
  * Plugin URI: PLUGIN SITE HERE
  * Text Domain: grab-image
  * Domain Path: /languages
- * @package grab-image
  */
 
 define('ALLOW_UNFILTERED_UPLOADS', true);
@@ -15,134 +16,17 @@ define('ALLOW_UNFILTERED_UPLOADS', true);
 // no limit time
 ini_set('max_execution_time', 300);
 
-// Start up the engine
-add_action('admin_menu', 'grab_image_page');
-add_action('wp_ajax_grab_image', 'grab_image_post');
-add_action('wp_ajax_attach_image', 'attach_image_post');
+// start up the engine
+add_action('admin_menu'             , 'grab_image_page'     );
+add_action('wp_ajax_grab_image'     , 'grab_image_post'     );
+add_action('wp_ajax_attach_image'   , 'attach_image_post'   );
+add_action('wp_ajax_search_image'   , 'search_image_post'   );
 
-function reconstruct_url($url) {
-    $url_parts = parse_url($url);
-    $constructed_url = $url_parts['scheme'] . '://' . $url_parts['host'] . $url_parts['path'];
-
-    return $constructed_url;
-}
-
-function reencode_url($url) {
-    $temp = basename($url);
-    $temp2 = urlencode($temp);
-
-    return str_replace($temp, $temp2, $url);
-}
-
-function clean_filename($file) {
-    $path = pathinfo($file);
-    if (isset($path['extension'])) {
-        $new_filename = preg_replace('/.' . $path['extension'] . '$/', '', $file);
-        $file = sanitize_title($new_filename) . '.' . $path['extension'];
-    }
-
-    return $file;
-}
-
-function real_filename($file) {
-    // remove size string
-    if (preg_match("/^(https?:\/\/.*)\-[0-9]+x[0-9]+\.(jpg|jpeg|png)$/", $file, $m)) {
-        $url = $m[1].'.'.$m[2];
-
-        // check file exist or not
-        $tmp = download_url(reencode_url($url));
-        if (!is_wp_error($tmp)) {
-            $file = $url;
-        }
-        @unlink($tmp);
-    }
-
-    return $file;
-}
+// require helper
+require_once 'helper.php';
 
 /**
- * extract all a|img tag from post_content
- * @param $str
- * @return array
- */
-function extract_image($str, $check_ignore = true) {
-    $a_pattern = "/<a[^>]*>(<img [^><]*\/?>)<\/a>/";
-    $img_pattern = "/<img[^>]+>/i";
-
-    preg_match_all($a_pattern, $str, $a_tags);
-    $str = preg_replace($a_pattern, '', $str);
-    preg_match_all($img_pattern, $str, $img_tags);
-
-    $tags = array_merge($a_tags[0], $img_tags[0]);
-    $srcs = array();
-    foreach ($tags as $tag) {
-        // get the source string
-        preg_match('%<img.*?src=["\'](.*?)["\'].*?/>%i', $tag , $result);
-        $url = $result[1];
-
-        if ($check_ignore) {
-            // ignore s3 image
-            if (strpos($url, 'wp-uploads.interactives.dk') !== false) {
-                continue;
-            }
-
-            // ignore niteco image
-            if (strpos($url, $_SERVER['SERVER_NAME']) !== false) {
-                continue;
-            }
-
-            // ignore relative image
-            if (strpos($url, 'http') === false) {
-                continue;
-            }
-        }
-
-        $srcs[$tag] = $url;
-    }
-
-    return $srcs;
-}
-
-/**
- * Get an attachment ID given a URL.
- * @param string $url
- * @return int Attachment ID on success, 0 on failure
- */
-function get_attachment_id( $url ) {
-    $attachment_id = 0;
-    $dir = wp_upload_dir();
-    if ( false !== strpos( $url, $dir['baseurl'] . '/' ) ) { // Is URL in uploads directory?
-        $file = basename( $url );
-        $query_args = array(
-            'post_type'   => 'attachment',
-            'post_status' => 'inherit',
-            'fields'      => 'ids',
-            'meta_query'  => array(
-                array(
-                    'value'   => $file,
-                    'compare' => 'LIKE',
-                    'key'     => '_wp_attachment_metadata',
-                ),
-            )
-        );
-        $query = new WP_Query( $query_args );
-        if ( $query->have_posts() ) {
-            foreach ( $query->posts as $post_id ) {
-                $meta = wp_get_attachment_metadata( $post_id );
-                $original_file       = basename( $meta['file'] );
-                $cropped_image_files = wp_list_pluck( $meta['sizes'], 'file' );
-                if ( $original_file === $file || in_array( $file, $cropped_image_files ) ) {
-                    $attachment_id = $post_id;
-                    break;
-                }
-            }
-        }
-    }
-    return $attachment_id;
-}
-
-/**
- * Define new menu page parameters
+ * define new menu page parameters
  */
 function grab_image_page() {
     add_menu_page( 'Grab image', 'Grab image', 'activate_plugins', 'grab-image', 'grab_image_run', '');
@@ -159,21 +43,29 @@ function grab_image_run() {
     <!-- Output for Plugin Options Page -->
     <div class="wrap">
         <?php
-        if (isset($_GET['action']) && !empty($_GET['action'])) {
-            echo '<div class="updated below-h2" id="message">';
-            switch ($_GET['action']) {
-                case 'grab':
-                    echo '<h2 id="">Grab image</h2> <p>Images are being grabbed !</p>';
-                    break;
+            if (isset($_GET['action']) && !empty($_GET['action'])) {
+                echo '<div class="updated below-h2" id="message">';
+                switch ($_GET['action']) {
+                    case 'grab':
+                        echo '<h2>Grab image</h2> <p>Images are being grabbed !</p>';
+                        break;
 
-                case 'attach':
-                    echo '<h2 id="">Attach image</h2> <p>Images are being attached !</p>';
-                    break;
+                    case 'attach':
+                        echo '<h2>Attach image</h2> <p>Images are being attached !</p>';
+                        break;
+
+                    case 'search':
+                        echo '<h2>Search / Replace image</h2> <p>Images are being searched and replaced !</p>';
+                        break;
+                }
+                echo '</div>';
             }
-            echo '</div>';
-        } ?>
-        <a href="?page=grab-image&amp;action=grab" class="button">Grab images</a>
-        <a href="?page=grab-image&amp;action=attach" class="button">Attach images</a>
+        ?>
+        <p>
+            <a href="?page=grab-image&amp;action=grab" class="btn btn-primary <?php echo ($_GET['action'] == 'grab' ? 'btn-danger' : ''); ?>">Grab images</a>
+            <a href="?page=grab-image&amp;action=attach" class="btn btn-primary <?php echo ($_GET['action'] == 'attach' ? 'btn-danger' : ''); ?>">Attach images</a>
+            <a href="?page=grab-image&amp;action=search" class="btn btn-primary <?php echo ($_GET['action'] == 'search' ? 'btn-danger' : ''); ?>">Search / Replace images</a>
+        </p>
     </div>
     <!-- End Output for Plugin Options Page -->
 
@@ -186,6 +78,7 @@ function grab_image_run() {
             switch ($_GET['action']) {
                 case 'grab':
                 case 'attach':
+                case 'search':
                     $posts = get_posts([
                         'posts_per_page' => 100000,
                         'post_status' => 'any',
@@ -210,6 +103,7 @@ function grab_image_run() {
                              */
                             jQuery('#start-grab').click(function () {
                                 function doNext() {
+
                                     if (++index >= post.length) {
                                         jQuery('#status-grab').html('Finish ...');
                                         return;
@@ -220,8 +114,12 @@ function grab_image_run() {
                                     var current = post.eq(index);
                                     var id = current.attr('rel');
                                     var data = {
-                                        'action': '<?php echo ($_GET['action'] == 'grab' ? 'grab_image' : 'attach_image'); ?>',
+                                        'action': '<?php echo $_GET['action'] . '_image'; ?>',
                                         'id': id,
+                                        <?php if ($_GET['action'] == 'search') { ?>
+                                        'search': search,
+                                        'replace': replace,
+                                        <?php } ?>
                                     };
 
                                     console.log(id);
@@ -243,6 +141,19 @@ function grab_image_run() {
                                     });
                                 }
 
+                                <?php if ($_GET['action'] == 'search') { ?>
+                                var search = $('#input-search').val();
+                                var replace = $('#input-replace').val();
+                                if (search == '' || replace == '') {
+                                    alert('You must enter search and replace input !');
+                                    return false;
+                                } else {
+                                    if (confirm("Are you sure you want to search '" + search + "' and replace to '" + replace + "'") != true) {
+                                        return false;
+                                    }
+                                }
+                                <?php } ?>
+
                                 doNext();
                             });
                         });
@@ -255,6 +166,14 @@ function grab_image_run() {
                                 <span id="status-grab"></span>
                             </th>
                         </tr>
+                        <?php if ($_GET['action'] == 'search') { ?>
+                        <tr>
+                            <th colspan="3">
+                                <label for="input-search">Search</label> <input class="input" type="text" id="input-search" />
+                                <label for="input-replace">Replace</label> <input class="" type="text" id="input-replace" />
+                            </th>
+                        </tr>
+                        <?php } ?>
                         <tr>
                             <th>#</th>
                             <th>Post</th>
@@ -278,6 +197,7 @@ function grab_image_run() {
 }
 
 /**
+ * @package grab-image
  * ajax function to grab image
  */
 function grab_image_post() {
@@ -431,6 +351,7 @@ function grab_image_post() {
 }
 
 /**
+ * @package grab-image
  * ajax function to attach image
  */
 function attach_image_post() {
@@ -490,5 +411,47 @@ function attach_image_post() {
     }
 
     echo 'Attach '. $count. ' image';
+    wp_die();
+}
+
+/**
+ * @package grab-image
+ * ajax function to search / replace image
+ */
+function search_image_post() {
+    $id = intval($_REQUEST['id']);
+    $post = get_post($id);
+    $search_str = (string) $_REQUEST['search'];
+    $replace_str = (string) $_REQUEST['replace'];
+
+    $array = extract_image($post->post_content, false);
+    $search = $replace = [];
+    $count = 0;
+    if (is_array($array) && count($array) > 0) {
+        foreach ($array as $tag => $url) {
+            if (strpos($url, $search_str) === false) {
+                continue;
+            }
+
+            $search[] = $tag;
+            $replace[] = str_replace($search_str, $replace_str, $tag);
+
+            echo "success ; {$url} <br/>";
+        }
+
+        // update post data
+        if (count($search) > 0 && count($replace) > 0) {
+            $post_content = str_replace($search, $replace, $post->post_content);
+            $my_post = [
+                'ID'           => $post->ID,
+                'post_content' => $post_content,
+            ];
+            wp_update_post($my_post);
+        }
+
+        $count = count($search);
+    }
+
+    echo 'Search / Replace '. $count. ' image';
     wp_die();
 }
