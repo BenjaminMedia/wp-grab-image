@@ -2,7 +2,7 @@
 /**
  * @package grab-image
  * Plugin Name: grab-image
- * Version: 0.2
+ * Version: 0.3
  * Description: Grabs images of img tags are re-uploads them to be located on the site.
  * Author: Niteco
  * Author URI: http://niteco.se/
