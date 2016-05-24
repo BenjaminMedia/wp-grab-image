@@ -2,7 +2,7 @@
 /**
  * @package grab-image
  * Plugin Name: grab-image
- * Version: 0.3
+ * Version: 0.4
  * Description: Grabs images of img tags are re-uploads them to be located on the site.
  * Author: Niteco
  * Author URI: http://niteco.se/
@@ -63,9 +63,17 @@ function grab_image_run() {
             }
         ?>
         <p>
-            <a href="?page=grab-image&amp;action=grab" class="btn btn-primary <?php echo (@$_GET['action'] == 'grab' ? 'btn-danger' : ''); ?>">Grab images</a>
-            <a href="?page=grab-image&amp;action=attach" class="btn btn-primary <?php echo (@$_GET['action'] == 'attach' ? 'btn-danger' : ''); ?>">Attach images</a>
-            <a href="?page=grab-image&amp;action=search" class="btn btn-primary <?php echo (@$_GET['action'] == 'search' ? 'btn-danger' : ''); ?>">Search / Replace images</a>
+            <ul class="nav nav-pills">
+                <li class="nav-item">
+                    <a href="?page=grab-image&amp;action=grab" class="nav-link <?php echo (@$_GET['action'] == 'grab' ? 'active' : ''); ?>">Grab images</a>
+                </li>
+                <li class="nav-item">
+                    <a href="?page=grab-image&amp;action=attach" class="nav-link <?php echo (@$_GET['action'] == 'attach' ? 'active' : ''); ?>">Attach images</a>
+                </li>
+                <li class="nav-item">
+                    <a href="?page=grab-image&amp;action=search" class="nav-link <?php echo (@$_GET['action'] == 'search' ? 'active' : ''); ?>">Search / Replace images</a>
+                </li>
+            </ul>
         </p>
     </div>
     <!-- End Output for Plugin Options Page -->
@@ -318,10 +326,8 @@ function grab_image_post() {
             $image = wp_get_attachment_image_src($attachmentId, 'full');
             $id = $attachmentId;
             $src = $image[0];
-            $width = $image[1];
-            $height = $image[2];
             $replace[] = "<a href=\"{$src}\" rel=\"attachment wp-att-{$id}\">"
-                . "<img class=\"alignnone size-full wp-image-{$id}\" src=\"{$src}\" alt=\"{$post->post_title}\" width=\"{$width}\" height=\"{$height}\" />"
+                . "<img class=\"alignnone size-full wp-image-{$id}\" src=\"{$src}\" alt=\"{$post->post_title}\" />"
                 . "</a>";
 
             // set post thumbnail
@@ -389,10 +395,8 @@ function attach_image_post() {
             $image = wp_get_attachment_image_src($attachmentId, 'full');
             $id = $attachmentId;
             $src = $image[0];
-            $width = $image[1];
-            $height = $image[2];
             $replace[] = "<a href=\"{$src}\" rel=\"attachment wp-att-{$id}\">"
-                . "<img class=\"alignnone size-full wp-image-{$id}\" src=\"{$src}\" alt=\"{$post->post_title}\" width=\"{$width}\" height=\"{$height}\" />"
+                . "<img class=\"alignnone size-full wp-image-{$id}\" src=\"{$src}\" alt=\"{$post->post_title}\" />"
                 . "</a>";
 
             echo "success ; {$url} ; {$attachmentId} <br/>";
