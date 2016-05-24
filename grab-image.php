@@ -15,6 +15,7 @@ define('ALLOW_UNFILTERED_UPLOADS', true);
 
 // no limit time
 ini_set('max_execution_time', 300);
+error_reporting(E_ERROR);
 
 // start up the engine
 add_action('admin_menu'             , 'grab_image_page'     );
@@ -62,9 +63,9 @@ function grab_image_run() {
             }
         ?>
         <p>
-            <a href="?page=grab-image&amp;action=grab" class="btn btn-primary <?php echo ($_GET['action'] == 'grab' ? 'btn-danger' : ''); ?>">Grab images</a>
-            <a href="?page=grab-image&amp;action=attach" class="btn btn-primary <?php echo ($_GET['action'] == 'attach' ? 'btn-danger' : ''); ?>">Attach images</a>
-            <a href="?page=grab-image&amp;action=search" class="btn btn-primary <?php echo ($_GET['action'] == 'search' ? 'btn-danger' : ''); ?>">Search / Replace images</a>
+            <a href="?page=grab-image&amp;action=grab" class="btn btn-primary <?php echo (@$_GET['action'] == 'grab' ? 'btn-danger' : ''); ?>">Grab images</a>
+            <a href="?page=grab-image&amp;action=attach" class="btn btn-primary <?php echo (@$_GET['action'] == 'attach' ? 'btn-danger' : ''); ?>">Attach images</a>
+            <a href="?page=grab-image&amp;action=search" class="btn btn-primary <?php echo (@$_GET['action'] == 'search' ? 'btn-danger' : ''); ?>">Search / Replace images</a>
         </p>
     </div>
     <!-- End Output for Plugin Options Page -->
