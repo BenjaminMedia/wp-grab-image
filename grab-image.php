@@ -151,8 +151,8 @@ function grab_image_run() {
                                 }
 
                                 <?php if ($_GET['action'] == 'search') { ?>
-                                var search = $('#input-search').val();
-                                var replace = $('#input-replace').val();
+                                var search = jQuery('#input-search').val();
+                                var replace = jQuery('#input-replace').val();
                                 if (search == '' || replace == '') {
                                     alert('You must enter search and replace input !');
                                     return false;
