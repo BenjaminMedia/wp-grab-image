@@ -2,7 +2,7 @@
 /**
  * @package grab-image
  * Plugin Name: grab-image
- * Version: 0.5
+ * Version: 0.7
  * Description: Grabs images of img tags are re-uploads them to be located on the site.
  * Author: Niteco
  * Author URI: http://niteco.se/
@@ -15,7 +15,7 @@ define('ALLOW_UNFILTERED_UPLOADS', true);
 
 // no limit time
 ini_set('max_execution_time', 300);
-error_reporting(E_ERROR);
+// error_reporting(E_ERROR);
 
 // start up the engine
 add_action('admin_menu'             , 'grab_image_page'     );
@@ -24,13 +24,13 @@ add_action('wp_ajax_attach_image'   , 'attach_image_post'   );
 add_action('wp_ajax_search_image'   , 'search_image_post'   );
 
 // require helper
-require_once 'helper.php';
+require_once dirname(__FILE__). '/helper.php';
 
 /**
  * define new menu page parameters
  */
 function grab_image_page() {
-    add_menu_page( 'Grab image', 'Grab image', 'activate_plugins', 'grab-image', 'grab_image_run', '');
+    add_menu_page( 'Grab images', 'Grab images', 'activate_plugins', 'grab-image', 'grab_image_run', '');
 }
 
 /**
@@ -48,15 +48,15 @@ function grab_image_run() {
                 echo '<div class="updated below-h2" id="message">';
                 switch ($_GET['action']) {
                     case 'grab':
-                        echo '<h2>Grab image</h2> <p>Images are being grabbed !</p>';
+                        echo '<h2>Grab images</h2> <p>Images are being grabbed !</p>';
                         break;
 
                     case 'attach':
-                        echo '<h2>Attach image</h2> <p>Images are being attached !</p>';
+                        echo '<h2>Attach images</h2> <p>Images are being attached !</p>';
                         break;
 
                     case 'search':
-                        echo '<h2>Search / Replace image</h2> <p>Images are being searched and replaced !</p>';
+                        echo '<h2>Search / Replace images</h2> <p>Images are being searched and replaced !</p>';
                         break;
                 }
                 echo '</div>';
@@ -139,10 +139,12 @@ function grab_image_run() {
                                         data: data,
                                         method: 'POST',
                                         success: function(msg) {
+                                            console.log(msg);
                                             jQuery('#image-' + id).html(msg);
                                             doNext();
                                         },
                                         error: function (msg) {
+                                            console.log(msg);
                                             jQuery('#image-' + id).html('Error ...');
                                             --index;
                                             setTimeout(doNext, 3000);
@@ -213,21 +215,23 @@ function grab_image_post() {
     $id = intval($_REQUEST['id']);
     $post = get_post($id);
 
-    $array = extract_image($post->post_content);
+    // call helper class
+    $helper = new grabimage_helper();
+
+    $array = $helper->extract_image($post->post_content);
     $search = $replace = [];
     $count = 0;
     if (is_array($array) && count($array) > 0) {
-        $thumb = 0;
         foreach ($array as $tag => $url) {
             // refine url
-            $url = reconstruct_url($url);
+            $url = $helper->reconstruct_url($url);
 
             // real url
-            $url = real_filename($url);
+            $url = $helper->real_filename($url);
 
             // init file
             $file = array();
-            $file['name'] = clean_filename(basename($url));
+            $file['name'] = $helper->clean_filename(basename($url));
 
             // check file exist on hard disk or not
             $time = current_time('mysql');
@@ -245,7 +249,7 @@ function grab_image_post() {
                 $file['file'] = $uploads['path']. '/'. $file['name'];
                 $filetype = wp_check_filetype($file['file']);
                 $file['type'] = $filetype['type'];
-                $file['tmp_name'] = download_url(reencode_url($url));
+                $file['tmp_name'] = download_url($helper->reencode_url($url));
                 $file['error'] = 0;
 
                 // check ignore file
@@ -313,11 +317,15 @@ function grab_image_post() {
                 $attachmentId = wp_insert_attachment($attachment, $file, $post->ID);
             }
 
-            // create the thumbnails
-            $attach_data = wp_generate_attachment_metadata( $attachmentId,  get_attached_file($attachmentId));
+            // ignore if it has any error
+            if (is_wp_error($attachmentId)) {
+                continue;
+            }
 
-            // update metadata
-            wp_update_attachment_metadata( $attachmentId,  $attach_data);
+            // set post thumbnail if not exist
+            if (!has_post_thumbnail($post->ID)) {
+                set_post_thumbnail($post->ID, $attachmentId);
+            }
 
             // search a|img tag
             $search[] = $tag;
@@ -330,15 +338,11 @@ function grab_image_post() {
                 . "<img class=\"alignnone size-full wp-image-{$id}\" src=\"{$src}\" alt=\"{$post->post_title}\" />"
                 . "</a>";
 
-            // set post thumbnail
-            if ($thumb == 0) {
-                set_post_thumbnail($post, $attachmentId);
-                $thumb = 1;
-            }
-
             $exist = ($exist ? '' : 'none-exist');
             echo "success ; {$url} ; {$attachmentId} ; {$exist} <br/>";
         }
+
+
 
         // update post data
         if (count($search) > 0 && count($replace) > 0) {
@@ -365,12 +369,15 @@ function attach_image_post() {
     $id = intval($_REQUEST['id']);
     $post = get_post($id);
 
-    $array = extract_image($post->post_content, false);
+    // call helper class
+    $helper = new grabimage_helper();
+
+    $array = $helper->extract_image($post->post_content, false);
     $search = $replace = [];
     $count = 0;
     if (is_array($array) && count($array) > 0) {
         foreach ($array as $tag => $url) {
-            $attachmentId = get_attachment_id($url);
+            $attachmentId = $helper->get_attachment_id($url);
             if (empty($attachmentId)) {
                 continue;
             }
@@ -429,7 +436,10 @@ function search_image_post() {
     $search_str = (string) $_REQUEST['search'];
     $replace_str = (string) $_REQUEST['replace'];
 
-    $array = extract_image($post->post_content, false);
+    // call helper class
+    $helper = new grabimage_helper();
+
+    $array = $helper->extract_image($post->post_content, false);
     $search = $replace = [];
     $count = 0;
     if (is_array($array) && count($array) > 0) {
