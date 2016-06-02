@@ -43,6 +43,22 @@ class grabimage_helper
     }
 
     /**
+     * check if image url exist or not
+     * @param $url
+     * @return bool
+     */
+    public function exist_filename($url)
+    {
+        $tmp = download_url($this->reencode_url($url));
+        if (!is_wp_error($tmp)) {
+            @unlink($tmp);
+            return true;
+        }
+        @unlink($tmp);
+        return false;
+    }
+
+    /**
      * get original image url (remove size)
      * @param $file
      * @return string
@@ -53,11 +69,9 @@ class grabimage_helper
             $url = $m[1].'.'.$m[2];
 
             // check file exist or not
-            $tmp = $this->download_url($this->reencode_url($url));
-            if (!is_wp_error($tmp)) {
+            if ($this->exist_filename($url)) {
                 $file = $url;
             }
-            @unlink($tmp);
         }
 
         return $file;
@@ -118,7 +132,7 @@ class grabimage_helper
     public function get_attachment_id( $url ) {
         $attachment_id = 0;
         $dir = wp_upload_dir();
-        if ( false !== strpos( $url, $dir['baseurl'] . '/' ) ) { // Is URL in uploads directory?
+        // if ( false !== strpos( basename( $url ), $dir['baseurl'] . '/' ) ) { // Is URL in uploads directory?
             $file = basename( $url );
             $query_args = array(
                 'post_type'   => 'attachment',
@@ -144,7 +158,7 @@ class grabimage_helper
                     }
                 }
             }
-        }
+        // }
         return $attachment_id;
     }
 
@@ -205,5 +219,88 @@ class grabimage_helper
         }
 
         return $tmpfname;
+    }
+
+    /**
+     * generate json file for mapping data
+     * @throws Exception
+     */
+    public function get_old_thumbnail()
+    {
+        $file = dirname(__FILE__). "/frutimian.wordpress.xml";
+        if (file_exists($file)) {
+            require_once dirname( __FILE__ ) . '/XML2Array.php';
+
+            $xml       = file_get_contents( $file );
+            $a         = XML2Array::createArray( $xml );
+            $items     = $a["rss"]["channel"]["item"];
+            $map       = [ ];
+            $thumbnail = [ ];
+
+            for ( $i = 0; $i < count( $items ); $i ++ ) {
+                $item       = $items[ $i ];
+                $id         = $item["wp:post_id"];
+                $map["$id"] = $i;
+            }
+
+            for ( $i = 0; $i < count( $items ); $i ++ ) {
+                $item       = $items[ $i ];
+                $id         = $item["wp:post_id"];
+                $post_title = $item["title"];
+                $post_type  = $item["wp:post_type"]["@cdata"];
+
+                if ( $post_type != "post" ) {
+                    continue;
+                }
+
+                $postmeta = $item["wp:postmeta"];
+                foreach ( $postmeta as $meta ) {
+                    if ( $meta["wp:meta_key"]["@cdata"] == "_thumbnail_id" ) {
+                        $thumb_id = $meta["wp:meta_value"]["@cdata"];
+                        $thumb    = $items[ $map["$thumb_id"] ];
+
+                        $thumb_url      = $thumb["guid"]["@value"];
+                        $attachment_url = $thumb["wp:attachment_url"]["@cdata"];
+
+                        $thumbnail["$id"] = array(
+                            "post_title"     => $post_title,
+                            "thumb_id"       => $thumb_id,
+                            "thumb_url"      => $thumb_url,
+                            "attachment_url" => $attachment_url,
+                        );
+                    }
+                }
+            }
+
+            file_put_contents(dirname(__FILE__). '/thumbnail.json', json_encode($thumbnail));
+        }
+
+        $file = dirname(__FILE__) . '/thumbnail.json';
+        if (file_exists($file)) {
+            $json = file_get_contents($file);
+            return json_decode($json, true);
+        } else {
+            return array();
+        }
+
+    }
+
+    /**
+     * set thumbnail for post from attachmentS
+     * @param $id
+     */
+    public function set_post_thumbnail($id)
+    {
+        $thumbnail_url = get_the_post_thumbnail_url($id);
+        if (!$thumbnail_url || !$this->exist_filename($thumbnail_url)) {
+            $attachments = get_attached_media('image', $id);
+            if (count($attachments) > 0) {
+                ksort($attachments);
+                foreach ($attachments as $key => $value) {
+                    set_post_thumbnail($id, $key);
+                    break;
+                }
+            }
+        }
     }
 }
