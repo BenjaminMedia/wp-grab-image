@@ -2,7 +2,7 @@
 /**
  * @package grab-image
  * Plugin Name: grab-image
- * Version: 0.7
+ * Version: 0.8
  * Description: Grabs images of img tags are re-uploads them to be located on the site.
  * Author: Niteco
  * Author URI: http://niteco.se/
@@ -15,13 +15,14 @@ define('ALLOW_UNFILTERED_UPLOADS', true);
 
 // no limit time
 ini_set('max_execution_time', 300);
-// error_reporting(E_ERROR);
+error_reporting(E_ERROR);
 
 // start up the engine
-add_action('admin_menu'             , 'grab_image_page'     );
-add_action('wp_ajax_grab_image'     , 'grab_image_post'     );
-add_action('wp_ajax_attach_image'   , 'attach_image_post'   );
-add_action('wp_ajax_search_image'   , 'search_image_post'   );
+add_action('admin_menu'                 , 'grab_image_page'                 );
+add_action('wp_ajax_grab_image'         , 'ajax_grab_image_post'            );
+add_action('wp_ajax_attach_image'       , 'ajax_attach_image_post'          );
+add_action('wp_ajax_search_image'       , 'ajax_search_image_post'          );
+add_action('wp_ajax_restore_image'      , 'ajax_restore_feature_image'      );
 
 // require helper
 require_once dirname(__FILE__). '/helper.php';
@@ -58,6 +59,10 @@ function grab_image_run() {
                     case 'search':
                         echo '<h2>Search / Replace images</h2> <p>Images are being searched and replaced !</p>';
                         break;
+
+                    case 'restore':
+                        echo '<h2>Restore feature images</h2> <p>Restore old feature images of frutimian.no !</p>';
+                        break;
                 }
                 echo '</div>';
             }
@@ -73,27 +78,59 @@ function grab_image_run() {
                 <li class="nav-item">
                     <a href="?page=grab-image&amp;action=search" class="nav-link <?php echo (@$_GET['action'] == 'search' ? 'active' : ''); ?>">Search / Replace images</a>
                 </li>
+                <li class="nav-item">
+                    <a href="?page=grab-image&amp;action=restore" class="nav-link <?php echo (@$_GET['action'] == 'restore' ? 'active' : ''); ?>">Restore feature images</a>
+                </li>
+                <li class="nav-item">
+                    <button id="box-status" class="btn btn-warning" style="display: none;"><span class="fa fa-refresh fa-refresh-animate"></span> Loading...</button>
+                </li>
             </ul>
         </p>
     </div>
     <!-- End Output for Plugin Options Page -->
 
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.0.0-alpha/css/bootstrap.min.css">
+        <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
         <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.0.0-beta1/jquery.min.js"></script>
         <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.0.0-alpha/js/bootstrap.min.js"></script>
+        <style type="text/css">
+            .nav-link {
+                cursor: pointer !important;
+            }
+            .fa-refresh-animate {
+                -animation: spin .7s infinite linear;
+                -webkit-animation: spin2 .7s infinite linear;
+            }
+            @-webkit-keyframes spin2 {
+                from { -webkit-transform: rotate(0deg);}
+                to { -webkit-transform: rotate(360deg);}
+            }
+            @keyframes spin {
+                from { transform: scale(1) rotate(0deg);}
+                to { transform: scale(1) rotate(360deg);}
+            }
+        </style>
 
     <?php
         if (isset($_GET['action']) && !empty($_GET['action'])) {
-            switch ($_GET['action']) {
+            $action = trim($_GET['action']);
+            switch ($action) {
                 case 'grab':
                 case 'attach':
                 case 'search':
+                case 'restore':
                     $posts = get_posts([
                         'posts_per_page' => 100000,
                         'post_status' => 'any',
                         'orderby' => 'ID',
                         'order'   => 'ASC',
                     ]);
+
+                    if ($action == 'restore') {
+                        // list of old post_id with thumbnail
+                        $helper = new grabimage_helper();
+                        $thumbnail = $helper->get_old_thumbnail();
+                    }
                     ?>
                     <script type="text/javascript">
                         jQuery(document).ready(function () {
@@ -103,36 +140,35 @@ function grab_image_run() {
                             /**
                              * click stop button
                              */
-                            jQuery('#stop-grab').click(function () {
+                            jQuery('#button-stop').click(function () {
                                 index = post.length;
                             });
 
                             /**
                              * click start button
                              */
-                            jQuery('#start-grab').click(function () {
+                            jQuery('#button-start').click(function () {
                                 function doNext() {
-
                                     if (++index >= post.length) {
-                                        jQuery('#status-grab').html('Finish ...');
+                                        jQuery('#box-status').hide();
                                         return;
                                     } else {
-                                        jQuery('#status-grab').html('Loading ...');
+                                        jQuery('#box-status').show();
                                     }
 
                                     var current = post.eq(index);
                                     var id = current.attr('rel');
                                     var data = {
-                                        'action': '<?php echo $_GET['action'] . '_image'; ?>',
+                                        'action': '<?php echo $action . '_image'; ?>',
                                         'id': id,
-                                        <?php if ($_GET['action'] == 'search') { ?>
+                                        <?php if ($action == 'search') { ?>
                                         'search': search,
                                         'replace': replace,
                                         <?php } ?>
                                     };
 
                                     console.log(id);
-                                    jQuery('#image-' + id).html('Loading ...');
+                                    jQuery('#result-' + id).html('Loading ...');
                                     jQuery.ajax({
                                         url: ajaxurl,
                                         cache: false,
@@ -140,29 +176,29 @@ function grab_image_run() {
                                         method: 'POST',
                                         success: function(msg) {
                                             console.log(msg);
-                                            jQuery('#image-' + id).html(msg);
+                                            jQuery('#result-' + id).html(msg);
                                             doNext();
                                         },
                                         error: function (msg) {
                                             console.log(msg);
-                                            jQuery('#image-' + id).html('Error ...');
+                                            jQuery('#result-' + id).html('Error ... Restart in 10s');
                                             --index;
-                                            setTimeout(doNext, 3000);
+                                            setTimeout(doNext, 10000);
                                         }
                                     });
                                 }
 
-                                <?php if ($_GET['action'] == 'search') { ?>
-                                var search = jQuery('#input-search').val();
-                                var replace = jQuery('#input-replace').val();
-                                if (search == '' || replace == '') {
-                                    alert('You must enter search and replace input !');
-                                    return false;
-                                } else {
-                                    if (confirm("Are you sure you want to search '" + search + "' and replace to '" + replace + "'") != true) {
+                                <?php if ($action == 'search') { ?>
+                                    var search = jQuery('#input-search').val();
+                                    var replace = jQuery('#input-replace').val();
+                                    if (search == '' || replace == '') {
+                                        alert('You must enter search and replace input !');
                                         return false;
+                                    } else {
+                                        if (confirm("Are you sure you want to search '" + search + "' and replace to '" + replace + "'") != true) {
+                                            return false;
+                                        }
                                     }
-                                }
                                 <?php } ?>
 
                                 doNext();
@@ -171,15 +207,14 @@ function grab_image_run() {
                     </script>
                     <table class="table table-striped">
                         <tr>
-                            <th colspan="3">
-                                <button class="btn btn-primary" id="start-grab">Start</button>
-                                <button class="btn btn-danger" id="stop-grab">Stop</button>
-                                <span id="status-grab"></span>
+                            <th colspan="4">
+                                <button class="btn btn-primary" id="button-start">Start</button>
+                                <button class="btn btn-danger" id="button-stop">Stop</button>
                             </th>
                         </tr>
-                        <?php if ($_GET['action'] == 'search') { ?>
+                        <?php if ($action == 'search') { ?>
                         <tr>
-                            <th colspan="3">
+                            <th colspan="4">
                                 <label for="input-search">Search</label> <input class="input" type="text" id="input-search" />
                                 <label for="input-replace">Replace</label> <input class="" type="text" id="input-replace" />
                             </th>
@@ -188,17 +223,37 @@ function grab_image_run() {
                         <tr>
                             <th>#</th>
                             <th>Post</th>
-                            <th>Image</th>
+                            <?php if ($action == 'restore') { ?>
+                                <th>Old feature image</th>
+                            <?php } ?>
+                            <th>Result</th>
                         </tr>
-                    <?php
-                    foreach ($posts as $i => $post) {
-                        ?>
-                        <tr>
-                            <td><?php echo ($i + 1); ?></td>
-                            <td class="post" rel="<?php echo $post->ID; ?>"><a href="<?php echo get_permalink($post->ID); ?>" target="_blank"><?php echo $post->ID; ?></a></td>
-                            <td id="image-<?php echo $post->ID; ?>"></td>
-                        </tr>
-                    <?php } ?>
+
+                        <?php foreach ($posts as $i => $post) { ?>
+                            <tr>
+                                <td><?php echo ($i + 1); ?></td>
+                                <td class="post" rel="<?php echo $post->ID; ?>"><a href="<?php echo get_edit_post_link($post->ID); ?>" target="_blank"><?php echo $post->ID; ?></a></td>
+                                <?php
+                                if ($action == 'restore') {
+                                    echo '<td>';
+                                    if (isset($thumbnail[$post->ID])) {
+                                        $thumb_url = $thumbnail[$post->ID]['thumb_url'];
+                                        $attachment_url = $thumbnail[$post->ID]['attachment_url'];
+                                        if (!empty($thumb_url)) {
+                                            echo $thumb_url;
+                                            echo '<br/>';
+                                        }
+                                        if (!empty($attachment_url)) {
+                                            echo "<a href='{$attachment_url}' target='_blank'>{$attachment_url}</a>";
+                                        }
+                                    }
+                                    echo '</td>';
+                                }
+                                ?>
+                                <td id="result-<?php echo $post->ID; ?>"></td>
+                            </tr>
+                        <?php } ?>
+
                     </table>
                         <?php
                     break;
@@ -211,7 +266,7 @@ function grab_image_run() {
  * @package grab-image
  * ajax function to grab image
  */
-function grab_image_post() {
+function ajax_grab_image_post() {
     $id = intval($_REQUEST['id']);
     $post = get_post($id);
 
@@ -322,11 +377,6 @@ function grab_image_post() {
                 continue;
             }
 
-            // set post thumbnail if not exist
-            if (!has_post_thumbnail($post->ID)) {
-                set_post_thumbnail($post->ID, $attachmentId);
-            }
-
             // search a|img tag
             $search[] = $tag;
 
@@ -338,11 +388,9 @@ function grab_image_post() {
                 . "<img class=\"alignnone size-full wp-image-{$id}\" src=\"{$src}\" alt=\"{$post->post_title}\" />"
                 . "</a>";
 
-            $exist = ($exist ? '' : 'none-exist');
-            echo "success ; {$url} ; {$attachmentId} ; {$exist} <br/>";
+            $exist = ($exist ? 'did exist' : 'didn\'t exist');
+            echo "<a href=\"".get_edit_post_link($attachmentId)."\">{$url}</a> was successfully uploaded. It <b>{$exist}</b> already.<br/>";
         }
-
-
 
         // update post data
         if (count($search) > 0 && count($replace) > 0) {
@@ -357,6 +405,9 @@ function grab_image_post() {
         $count = count($search);
     }
 
+    // set post thumbnail if not exist
+    $helper->set_post_thumbnail($post->ID);
+
     echo 'Found '. $count. ' new image';
     wp_die();
 }
@@ -365,7 +416,7 @@ function grab_image_post() {
  * @package grab-image
  * ajax function to attach image
  */
-function attach_image_post() {
+function ajax_attach_image_post() {
     $id = intval($_REQUEST['id']);
     $post = get_post($id);
 
@@ -430,7 +481,7 @@ function attach_image_post() {
  * @package grab-image
  * ajax function to search / replace image
  */
-function search_image_post() {
+function ajax_search_image_post() {
     $id = intval($_REQUEST['id']);
     $post = get_post($id);
     $search_str = (string) $_REQUEST['search'];
@@ -468,5 +519,65 @@ function search_image_post() {
     }
 
     echo 'Search / Replace '. $count. ' image';
+    wp_die();
+}
+
+/**
+ * @package grab-image
+ * ajax function to restore old feature images of frutimian.no
+ */
+function ajax_restore_feature_image() {
+    $old = $new = '';
+
+    $id = intval($_REQUEST['id']);
+    $post = get_post($id);
+    if (empty($post)) {
+        echo 'Wrong post ID';
+        wp_die();
+    }
+
+    $helper = new grabimage_helper();
+    $thumbnail = $helper->get_old_thumbnail();
+    if (isset($thumbnail[$id])) {
+        $thumb = $thumbnail[$id];
+        if (!empty($thumb['attachment_url'])) {
+            // old feature image url
+            $old = $thumb['attachment_url'];
+            $attachment_id = $helper->get_attachment_id($thumb['attachment_url']);
+            if (!empty($attachment_id)) {
+                set_post_thumbnail($post, $attachment_id);
+            }
+        }
+    }
+
+    // check post thumbnail exist or not
+    $helper->set_post_thumbnail($post->ID);
+
+    // new feature image url
+    $new = get_the_post_thumbnail_url($id);
+
+    if (empty($old)) {
+        if (empty($new)) {
+            echo 'No feature image was added';
+        } else {
+            echo $new;
+            echo '<br/>';
+            echo 'Success adding';
+        }
+    } else {
+        if (empty($new)) {
+            echo 'No feature image was added';
+        } else {
+            echo $new;
+            echo '<br/>';
+            if (basename($old) == basename($new)) {
+                echo 'Same feature images';
+            } else {
+                echo 'Success restoring';
+            }
+        }
+
+    }
+
     wp_die();
 }
