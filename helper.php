@@ -63,7 +63,8 @@ class grabimage_helper
      * @param $file
      * @return string
      */
-    public function real_filename($file) {
+    public function real_filename($file)
+    {
         // remove size string
         if (preg_match("/^(https?:\/\/.*)\-[0-9]+x[0-9]+\.(jpg|jpeg|png)$/", $file, $m)) {
             $url = $m[1].'.'.$m[2];
@@ -75,6 +76,21 @@ class grabimage_helper
         }
 
         return $file;
+    }
+
+    /**
+     * compare basename of original and current featured images
+     * @param $first
+     * @param $second
+     *
+     * @return bool
+     */
+    public function compare_basename($first, $second)
+    {
+        $first = $this->clean_filename(basename(trim($first)));
+        $second = $this->clean_filename(basename(trim($second)));
+
+        return ($first == $second);
     }
 
     /**
@@ -126,99 +142,56 @@ class grabimage_helper
 
     /**
      * Get an attachment ID given a URL.
+     *
      * @param string $url
+     * @param bool $check_base
+     *
      * @return int Attachment ID on success, 0 on failure
      */
-    public function get_attachment_id( $url ) {
+    public function get_attachment_id($url, $check_base = false) {
         $attachment_id = 0;
-        $dir = wp_upload_dir();
-        // if ( false !== strpos( basename( $url ), $dir['baseurl'] . '/' ) ) { // Is URL in uploads directory?
-            $file = basename( $url );
-            $query_args = array(
-                'post_type'   => 'attachment',
-                'post_status' => 'inherit',
-                'fields'      => 'ids',
-                'meta_query'  => array(
-                    array(
-                        'value'   => $file,
-                        'compare' => 'LIKE',
-                        'key'     => '_wp_attachment_metadata',
-                    ),
-                )
-            );
-            $query = new WP_Query( $query_args );
-            if ( $query->have_posts() ) {
-                foreach ( $query->posts as $post_id ) {
-                    $meta = wp_get_attachment_metadata( $post_id );
-                    $original_file       = basename( $meta['file'] );
-                    $cropped_image_files = wp_list_pluck( $meta['sizes'], 'file' );
-                    if ( $original_file === $file || in_array( $file, $cropped_image_files ) ) {
-                        $attachment_id = $post_id;
-                        break;
-                    }
+
+        if ($check_base) {
+            $dir = wp_upload_dir();
+            if (false !== strpos(basename($url), $dir['baseurl'] . '/')) { // Is URL in uploads directory?
+                return $attachment_id;
+            }
+        }
+
+        $file = basename($url);
+        $file2 = $this->clean_filename($file);
+        $query_args = array(
+            'post_type'   => 'attachment',
+            'post_status' => 'inherit',
+            'fields'      => 'ids',
+            'meta_query'  => array(
+                'relation' => 'OR',
+                array(
+                    'value'   => $file,
+                    'compare' => 'LIKE',
+                    'key'     => '_wp_attachment_metadata',
+                ),
+                array(
+                    'value'   => $file2,
+                    'compare' => 'LIKE',
+                    'key'     => '_wp_attachment_metadata',
+                ),
+            )
+        );
+        $query = new WP_Query( $query_args );
+        if ( $query->have_posts() ) {
+            foreach ( $query->posts as $post_id ) {
+                $meta = wp_get_attachment_metadata( $post_id );
+                $original_file       = basename( $meta['file'] );
+                $cropped_image_files = wp_list_pluck( $meta['sizes'], 'file' );
+                if ($original_file === $file || in_array($file, $cropped_image_files) || $original_file === $file2 || in_array($file2, $cropped_image_files)) {
+                    $attachment_id = $post_id;
+                    break;
                 }
             }
-        // }
+        }
+
         return $attachment_id;
-    }
-
-    /**
-     * Downloads a url to a local temporary file using the WordPress HTTP Class.
-     * Please note, That the calling function must unlink() the file.
-     *
-     * @since 2.5.0
-     *
-     * @param string $url the URL of the file to download
-     * @param int $timeout The timeout for the request to download the file default 300 seconds
-     * @return mixed WP_Error on failure, string Filename on success.
-     */
-    public function download_url( $url, $timeout = 300 ) {
-        //WARNING: The file is not automatically deleted, The script must unlink() the file.
-        if (! $url)
-            return new WP_Error('http_no_url', __('Invalid URL Provided.'));
-
-        $tmpfname = wp_tempnam($url);
-        if (! $tmpfname)
-            return new WP_Error('http_no_file', __('Could not create Temporary file.'));
-
-        // download file by snoopy
-        $snoopy = new Snoopy;
-
-        // need an proxy?:
-        //$snoopy->proxy_host = "my.proxy.host";
-        //$snoopy->proxy_port = "8080";
-
-        // set browser and referer:
-        $snoopy->agent = "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)";
-        $snoopy->referer = "http://www.google.com/";
-
-        // set some cookies:
-        $snoopy->cookies["SessionID"] = '238472834723489';
-        $snoopy->cookies["favoriteColor"] = "blue";
-
-        // set an raw-header:
-        $snoopy->rawheaders["Pragma"] = "no-cache";
-
-        // set some internal variables:
-        $snoopy->maxredirs = 2;
-        $snoopy->offsiteok = false;
-        $snoopy->expandlinks = false;
-
-        // fetch url
-        $snoopy->fetch($url);
-
-        $headers = array();
-        while(list($key, $val) = each($snoopy->headers)){
-            $headers[$key] = $val;
-        }
-
-        if (strpos($snoopy->response_code, '200') === false) {
-            return new WP_Error('http_404', trim($snoopy->error));
-        } else {
-            file_put_contents($tmpfname, $snoopy->results);
-        }
-
-        return $tmpfname;
     }
 
     /**
@@ -227,6 +200,7 @@ class grabimage_helper
      */
     public function get_old_thumbnail()
     {
+        /**************************************************
         $file = dirname(__FILE__). "/frutimian.wordpress.xml";
         if (file_exists($file)) {
             require_once dirname( __FILE__ ) . '/XML2Array.php';
@@ -274,6 +248,7 @@ class grabimage_helper
 
             file_put_contents(dirname(__FILE__). '/thumbnail.json', json_encode($thumbnail));
         }
+        /**************************************************/
 
         $file = dirname(__FILE__) . '/thumbnail.json';
         if (file_exists($file)) {
@@ -291,7 +266,7 @@ class grabimage_helper
      */
     public function set_post_thumbnail($id)
     {
-        $thumbnail_url = get_the_post_thumbnail_url($id);
+        $thumbnail_url = get_the_post_thumbnail_url($id, 'full');
         if (!$thumbnail_url || !$this->exist_filename($thumbnail_url)) {
             $attachments = get_attached_media('image', $id);
             if (count($attachments) > 0) {
@@ -302,5 +277,180 @@ class grabimage_helper
                 }
             }
         }
+    }
+
+    /**
+     * Download an url to local using snoopy class
+     *
+     * @param $url
+     * @param int $timeout
+     *
+     * @return string|WP_Error
+     */
+    public function download_url( $url, $timeout = 300 ) {
+        //WARNING: The file is not automatically deleted, The script must unlink() the file.
+        if (! $url)
+            return new WP_Error('http_no_url', __('Invalid URL Provided.'));
+
+        $tmpfname = wp_tempnam($url);
+        if (! $tmpfname)
+            return new WP_Error('http_no_file', __('Could not create Temporary file.'));
+
+        // download file by snoopy
+        $snoopy = new Snoopy;
+
+        // need an proxy?:
+        // $snoopy->proxy_host = "my.proxy.host";
+        // $snoopy->proxy_port = "8080";
+
+        // set browser and referer:
+        $snoopy->agent = "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)";
+        $snoopy->referer = "http://www.google.com/";
+
+        // set some cookies:
+        $snoopy->cookies["SessionID"] = '238472834723489';
+        $snoopy->cookies["favoriteColor"] = "blue";
+
+        // set an raw-header:
+        $snoopy->rawheaders["Pragma"] = "no-cache";
+
+        // set some internal variables:
+        $snoopy->maxredirs = 2;
+        $snoopy->offsiteok = false;
+        $snoopy->expandlinks = false;
+
+        // fetch url
+        $snoopy->fetch($url);
+
+        $headers = array();
+        while(list($key, $val) = each($snoopy->headers)){
+            $headers[$key] = $val;
+        }
+
+        if (strpos($snoopy->response_code, '200') === false) {
+            return new WP_Error('http_404', trim($snoopy->error));
+        } else {
+            file_put_contents($tmpfname, $snoopy->results);
+        }
+
+        return $tmpfname;
+    }
+
+    /**
+     * download image from url
+     * insert to post as attachment
+     *
+     * @param $url
+     * @param $post_id
+     *
+     * @return bool|int|object
+     */
+    public function media_handle_sideload($url, $post_id)
+    {
+        $post = get_post($post_id);
+
+        // check file exist on hard disk or not
+        $time = current_time('mysql');
+        if (substr($post->post_date, 0, 4) > 0) {
+            $time = $post->post_date;
+        }
+        $uploads = wp_upload_dir($time);
+
+        $file = array();
+        $file['name'] = $this->clean_filename(basename($url));
+
+        // build up array like PHP file upload
+        $file['file'] = $uploads['path']. '/'. $file['name'];
+        $filetype = wp_check_filetype($file['file']);
+        $file['type'] = $filetype['type'];
+        $file['tmp_name'] = download_url($this->reencode_url($url));
+        $file['error'] = 0;
+
+        // check ignore file
+        $ignore = false;
+
+        // ignore 404 file
+        if (is_wp_error($file['tmp_name'])) {
+            @unlink($file['tmp_name']);
+            $ignore = true;
+        }
+
+        // ignore empty file
+        if (!$ignore) {
+            $file['size'] = filesize($file['tmp_name']);
+            if ($file['size'] <= 0) {
+                $ignore = true;
+            }
+        }
+
+        // continue if ignore
+        if ($ignore) {
+            echo "error ; {$url} <br/>";
+            return false;
+        }
+
+        // sideload image
+        $attachment_id = media_handle_sideload($file, $post->ID);
+
+        return $attachment_id;
+    }
+
+    /**
+     * insert to post as attachment
+     *
+     * @param $url
+     * @param $post_id
+     *
+     * @return int
+     */
+    public function media_insert_sideload($url, $post_id)
+    {
+        $post = get_post($post_id);
+
+        // check file exist on hard disk or not
+        $time = current_time('mysql');
+        if (substr($post->post_date, 0, 4) > 0) {
+            $time = $post->post_date;
+        }
+        $uploads = wp_upload_dir($time);
+
+        // insert to db
+        $file = array();
+        $file['name'] = $this->clean_filename(basename($url));
+        $file['file'] = $uploads['path']. '/'. $file['name'];
+        $file['url'] = $uploads['url']. '/'. $file['name'];
+        $filetype = wp_check_filetype($file['file']);
+        $file['type'] = $filetype['type'];
+        $file['error'] = 0;
+
+        $type = $file['type'];
+        $file = $file['file'];
+        $title = preg_replace('/\.[^.]+$/', '', basename($file));
+        $content = '';
+
+        // Use image exif/iptc data for title and caption defaults if possible.
+        if ($image_meta = @wp_read_image_metadata($file)) {
+            if (trim($image_meta['title']) && !is_numeric(sanitize_title($image_meta['title'])))
+                $title = $image_meta['title'];
+            if (trim($image_meta['caption']))
+                $content = $image_meta['caption'];
+        }
+
+        // Construct the attachment array.
+        $attachment = array(
+            'post_mime_type' => $type,
+            'guid' => $url,
+            'post_parent' => $post->ID,
+            'post_title' => $title,
+            'post_content' => $content,
+        );
+
+        // This should never be set as it would then overwrite an existing attachment.
+        unset($attachment['ID']);
+
+        // Save the attachment metadata
+        $attachment_id = wp_insert_attachment($attachment, $file, $post->ID);
+
+        return $attachment_id;
     }
 }
