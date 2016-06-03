@@ -4,11 +4,24 @@ require_once dirname(__FILE__). '/snoopy.class.php';
 class grabimage_helper
 {
     /**
+     * basename function for utf8
+     * @param $url
+     *
+     * @return mixed
+     */
+    public function basename($url)
+    {
+        $temp = explode('/', $url);
+        return $temp[count($temp) - 1];
+    }
+
+    /**
      * refine url
      * @param $url
      * @return string
      */
-    public function reconstruct_url($url) {
+    public function reconstruct_url($url)
+    {
         $url_parts = parse_url($url);
         $constructed_url = $url_parts['scheme'] . '://' . $url_parts['host'] . $url_parts['path'];
 
@@ -20,11 +33,13 @@ class grabimage_helper
      * @param $url
      * @return mixed
      */
-    public function reencode_url($url) {
-        $temp = basename($url);
-        $temp2 = urlencode($temp);
+    public function reencode_url($url)
+    {
+        $temp = explode('/', $url);
+        $temp2 = $temp[count($temp) - 1];
+        $temp[count($temp) - 1] = urlencode($temp2);
 
-        return str_replace($temp, $temp2, $url);
+        return implode('/', $temp);
     }
 
     /**
@@ -87,8 +102,11 @@ class grabimage_helper
      */
     public function compare_basename($first, $second)
     {
-        $first = $this->clean_filename(basename(trim($first)));
-        $second = $this->clean_filename(basename(trim($second)));
+        $first = $this->clean_filename($this->basename(trim($first)));
+        $second = $this->clean_filename($this->basename(trim($second)));
+
+        $first = preg_replace('/[-0-9]/', '', $first);
+        $second = preg_replace('/[-0-9]/', '', $second);
 
         return ($first == $second);
     }
@@ -153,13 +171,14 @@ class grabimage_helper
 
         if ($check_base) {
             $dir = wp_upload_dir();
-            if (false !== strpos(basename($url), $dir['baseurl'] . '/')) { // Is URL in uploads directory?
+            if (false !== strpos($this->basename($url), $dir['baseurl'] . '/')) { // Is URL in uploads directory?
                 return $attachment_id;
             }
         }
 
-        $file = basename($url);
+        $file = $this->basename($url);
         $file2 = $this->clean_filename($file);
+        $file3 = preg_replace('/[-0-9]/', '', $file2);
         $query_args = array(
             'post_type'   => 'attachment',
             'post_status' => 'inherit',
@@ -176,15 +195,22 @@ class grabimage_helper
                     'compare' => 'LIKE',
                     'key'     => '_wp_attachment_metadata',
                 ),
+                array(
+                    'value'   => $file3,
+                    'compare' => 'LIKE',
+                    'key'     => '_wp_attachment_metadata',
+                ),
             )
         );
         $query = new WP_Query( $query_args );
         if ( $query->have_posts() ) {
             foreach ( $query->posts as $post_id ) {
                 $meta = wp_get_attachment_metadata( $post_id );
-                $original_file       = basename( $meta['file'] );
+                $original_file       = $this->basename( $meta['file'] );
                 $cropped_image_files = wp_list_pluck( $meta['sizes'], 'file' );
-                if ($original_file === $file || in_array($file, $cropped_image_files) || $original_file === $file2 || in_array($file2, $cropped_image_files)) {
+                if (   $original_file === $file  || in_array($file , $cropped_image_files)
+                    || $original_file === $file2 || in_array($file2, $cropped_image_files)
+                    || $original_file === $file3 || in_array($file3, $cropped_image_files)) {
                     $attachment_id = $post_id;
                     break;
                 }
@@ -357,14 +383,15 @@ class grabimage_helper
         $uploads = wp_upload_dir($time);
 
         $file = array();
-        $file['name'] = $this->clean_filename(basename($url));
+        $file['name'] = $this->clean_filename($this->basename($url));
 
         // build up array like PHP file upload
         $file['file'] = $uploads['path']. '/'. $file['name'];
         $filetype = wp_check_filetype($file['file']);
         $file['type'] = $filetype['type'];
-        $file['tmp_name'] = download_url($this->reencode_url($url));
+        $file['tmp_name'] = $this->download_url($this->reencode_url($url));
         $file['error'] = 0;
+        $file['url'] = $this->reencode_url($url);
 
         // check ignore file
         $ignore = false;
@@ -416,7 +443,7 @@ class grabimage_helper
 
         // insert to db
         $file = array();
-        $file['name'] = $this->clean_filename(basename($url));
+        $file['name'] = $this->clean_filename($this->basename($url));
         $file['file'] = $uploads['path']. '/'. $file['name'];
         $file['url'] = $uploads['url']. '/'. $file['name'];
         $filetype = wp_check_filetype($file['file']);
@@ -425,7 +452,7 @@ class grabimage_helper
 
         $type = $file['type'];
         $file = $file['file'];
-        $title = preg_replace('/\.[^.]+$/', '', basename($file));
+        $title = preg_replace('/\.[^.]+$/', '', $this->basename($file));
         $content = '';
 
         // Use image exif/iptc data for title and caption defaults if possible.

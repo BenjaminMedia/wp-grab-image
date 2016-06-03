@@ -2,7 +2,7 @@
 /**
  * @package grab-image
  * Plugin Name: grab-image
- * Version: 0.8
+ * Version: 1.0
  * Description: Grabs images of img tags are re-uploads them to be located on the site.
  * Author: Niteco
  * Author URI: http://niteco.se/
@@ -15,7 +15,7 @@ define('ALLOW_UNFILTERED_UPLOADS', true);
 
 // no limit time
 ini_set('max_execution_time', 300);
-// error_reporting(E_ERROR);
+error_reporting(E_ERROR);
 
 // start up the engine
 add_action('admin_menu'                 , 'grab_image_page'                 );
@@ -257,10 +257,7 @@ function grab_image_run() {
                                         echo "<a href='{$current_url}' target='_blank'>{$current_url}</a>";
                                     }
                                     echo '</td>';
-                                }
-                                ?>
-                                <td>
-                                    <?php
+                                    echo '<td>';
                                     if (empty($current_url)) {
                                         echo '<span class="label label-default">No featured image</span>';
                                     } else {
@@ -269,8 +266,10 @@ function grab_image_run() {
                                         } else {
                                             echo '<span class="label label-danger">Different featured image</span>';
                                         }
-                                    } ?>
-                                </td>
+                                    }
+                                    echo '</td>';
+                                }
+                                ?>
                                 <td id="result-<?php echo $post->ID; ?>"></td>
                             </tr>
                         <?php } ?>
@@ -309,7 +308,7 @@ function ajax_grab_image_post() {
 
             // init file
             $file = array();
-            $file['name'] = $helper->clean_filename(basename($url));
+            $file['name'] = $helper->clean_filename($helper->basename($url));
 
             // get uploads path
             $time = current_time('mysql');
