@@ -2,7 +2,7 @@
 /**
  * @package grab-image
  * Plugin Name: grab-image
- * Version: 0.9
+ * Version: 1.0
  * Description: Grabs images of img tags are re-uploads them to be located on the site.
  * Author: Niteco
  * Author URI: http://niteco.se/
@@ -233,6 +233,9 @@ function grab_image_run() {
                         <?php
                         foreach ($posts as $i => $post) {
                             $original_url = '';
+                            if ($action == 'restore' && !isset($thumbnail[$post->ID])) {
+                                continue;
+                            }
                             ?>
                             <tr>
                                 <td><?php echo ($i + 1); ?></td>
