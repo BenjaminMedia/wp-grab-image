@@ -2,7 +2,7 @@
 /**
  * @package grab-image
  * Plugin Name: grab-image
- * Version: 1.1
+ * Version: 1.2
  * Description: Grabs images of img tags are re-uploads them to be located on the site.
  * Author: Niteco
  * Author URI: http://niteco.se/
@@ -167,6 +167,14 @@ function grab_image_run() {
                                         <?php } ?>
                                     };
 
+                                    <?php if ($action == 'restore') { ?>
+                                    var restore = jQuery('#restore-' + id);
+                                    if (restore.attr('status') != 'diff') {
+                                        doNext();
+                                        return;
+                                    }
+                                    <?php } ?>
+
                                     console.log(id);
                                     jQuery('#result-' + id).html('Loading ...');
                                     jQuery.ajax({
@@ -262,15 +270,30 @@ function grab_image_run() {
                                         echo "<a href='{$current_url}' target='_blank'>{$current_url}</a>";
                                     }
                                     echo '</td>';
-                                    echo '<td>';
+
                                     if (empty($current_url)) {
-                                        echo '<span class="label label-default">No featured image</span>';
+                                        $status = 'none';
                                     } else {
                                         if ($helper->compare_basename($original_url, $current_url)) {
-                                            echo '<span class="label label-success">Same featured image</span>';
+                                            $status = 'same';
                                         } else {
-                                            echo '<span class="label label-danger">Different featured image</span>';
+                                            $status = 'diff';
                                         }
+                                    }
+
+                                    echo "<td id='restore-{$post->ID}' status='{$status}'>";
+                                    switch ($status) {
+                                        case 'none':
+                                            echo '<span attr-status="none" class="label label-default">No featured image</span>';
+                                            break;
+
+                                        case 'same':
+                                            echo '<span attr-status="same" class="label label-success">Same featured image</span>';
+                                            break;
+
+                                        case 'diff':
+                                            echo '<span attr-status="diff" class="label label-danger">Different featured image</span>';
+                                            break;
                                     }
                                     echo '</td>';
                                 }
