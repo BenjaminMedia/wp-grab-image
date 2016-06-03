@@ -12,6 +12,7 @@ class grabimage_helper
     public function basename($url)
     {
         $temp = explode('/', $url);
+
         return $temp[count($temp) - 1];
     }
 
@@ -70,6 +71,7 @@ class grabimage_helper
             return true;
         }
         @unlink($tmp);
+
         return false;
     }
 
@@ -104,9 +106,6 @@ class grabimage_helper
     {
         $first = $this->clean_filename($this->basename(trim($first)));
         $second = $this->clean_filename($this->basename(trim($second)));
-
-        $first = preg_replace('/[-0-9]/', '', $first);
-        $second = preg_replace('/[-0-9]/', '', $second);
 
         return ($first == $second);
     }
@@ -178,7 +177,6 @@ class grabimage_helper
 
         $file = $this->basename($url);
         $file2 = $this->clean_filename($file);
-        $file3 = preg_replace('/[-0-9]/', '', $file2);
         $query_args = array(
             'post_type'   => 'attachment',
             'post_status' => 'inherit',
@@ -195,11 +193,6 @@ class grabimage_helper
                     'compare' => 'LIKE',
                     'key'     => '_wp_attachment_metadata',
                 ),
-                array(
-                    'value'   => $file3,
-                    'compare' => 'LIKE',
-                    'key'     => '_wp_attachment_metadata',
-                ),
             )
         );
         $query = new WP_Query( $query_args );
@@ -209,8 +202,7 @@ class grabimage_helper
                 $original_file       = $this->basename( $meta['file'] );
                 $cropped_image_files = wp_list_pluck( $meta['sizes'], 'file' );
                 if (   $original_file === $file  || in_array($file , $cropped_image_files)
-                    || $original_file === $file2 || in_array($file2, $cropped_image_files)
-                    || $original_file === $file3 || in_array($file3, $cropped_image_files)) {
+                    || $original_file === $file2 || in_array($file2, $cropped_image_files)) {
                     $attachment_id = $post_id;
                     break;
                 }
@@ -293,7 +285,7 @@ class grabimage_helper
     public function set_post_thumbnail($id)
     {
         $thumbnail_url = get_the_post_thumbnail_url($id, 'full');
-        if (!$thumbnail_url || !$this->exist_filename($thumbnail_url)) {
+        if (!$thumbnail_url) {
             $attachments = get_attached_media('image', $id);
             if (count($attachments) > 0) {
                 ksort($attachments);
