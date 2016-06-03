@@ -2,7 +2,7 @@
 /**
  * @package grab-image
  * Plugin Name: grab-image
- * Version: 0.8
+ * Version: 0.9
  * Description: Grabs images of img tags are re-uploads them to be located on the site.
  * Author: Niteco
  * Author URI: http://niteco.se/
@@ -61,7 +61,7 @@ function grab_image_run() {
                         break;
 
                     case 'restore':
-                        echo '<h2>Restore feature images</h2> <p>Restore old feature images of frutimian.no !</p>';
+                        echo '<h2>Restore featured images</h2> <p>Restore old featured images of frutimian.no !</p>';
                         break;
                 }
                 echo '</div>';
@@ -79,7 +79,7 @@ function grab_image_run() {
                     <a href="?page=grab-image&amp;action=search" class="nav-link <?php echo (@$_GET['action'] == 'search' ? 'active' : ''); ?>">Search / Replace images</a>
                 </li>
                 <li class="nav-item">
-                    <a href="?page=grab-image&amp;action=restore" class="nav-link <?php echo (@$_GET['action'] == 'restore' ? 'active' : ''); ?>">Restore feature images</a>
+                    <a href="?page=grab-image&amp;action=restore" class="nav-link <?php echo (@$_GET['action'] == 'restore' ? 'active' : ''); ?>">Restore featured images</a>
                 </li>
                 <li class="nav-item">
                     <button id="box-status" class="btn btn-warning" style="display: none;"><span class="fa fa-refresh fa-refresh-animate"></span> Loading...</button>
@@ -207,7 +207,7 @@ function grab_image_run() {
                     </script>
                     <table class="table table-striped">
                         <tr>
-                            <th colspan="4">
+                            <th colspan="5">
                                 <button class="btn btn-primary" id="button-start">Start</button>
                                 <button class="btn btn-danger" id="button-stop">Stop</button>
                             </th>
@@ -224,12 +224,16 @@ function grab_image_run() {
                             <th>#</th>
                             <th>Post</th>
                             <?php if ($action == 'restore') { ?>
-                                <th>Old feature image</th>
+                                <th>Featured image</th>
+                                <th>Status</th>
                             <?php } ?>
                             <th>Result</th>
                         </tr>
 
-                        <?php foreach ($posts as $i => $post) { ?>
+                        <?php
+                        foreach ($posts as $i => $post) {
+                            $original_url = '';
+                            ?>
                             <tr>
                                 <td><?php echo ($i + 1); ?></td>
                                 <td class="post" rel="<?php echo $post->ID; ?>"><a href="<?php echo get_edit_post_link($post->ID); ?>" target="_blank"><?php echo $post->ID; ?></a></td>
@@ -237,14 +241,30 @@ function grab_image_run() {
                                 if ($action == 'restore') {
                                     echo '<td>';
                                     if (isset($thumbnail[$post->ID])) {
-                                        $thumb_url = $thumbnail[$post->ID]['thumb_url'];
-                                        $attachment_url = $thumbnail[$post->ID]['attachment_url'];
-                                        if (!empty($thumb_url)) {
-                                            echo $thumb_url;
+                                        $original_url = $thumbnail[$post->ID]['attach_url'];
+                                        if (!empty($original_url)) {
+                                            echo 'Original : ';
+                                            echo "<a href='{$original_url}' target='_blank'>{$original_url}</a>";
+                                        }
+                                    }
+
+                                    $current_url = get_the_post_thumbnail_url($post->ID, 'full');
+                                    if (!empty($current_url)) {
+                                        if (!empty($original_url)) {
                                             echo '<br/>';
                                         }
-                                        if (!empty($attachment_url)) {
-                                            echo "<a href='{$attachment_url}' target='_blank'>{$attachment_url}</a>";
+                                        echo 'Current : ';
+                                        echo "<a href='{$current_url}' target='_blank'>{$current_url}</a>";
+                                    }
+                                    echo '</td>';
+                                    echo '<td>';
+                                    if (empty($current_url)) {
+                                        echo '<span class="label label-default">No featured image</span>';
+                                    } else {
+                                        if ($helper->compare_basename($original_url, $current_url)) {
+                                            echo '<span class="label label-success">Same featured image</span>';
+                                        } else {
+                                            echo '<span class="label label-danger">Different featured image</span>';
                                         }
                                     }
                                     echo '</td>';
@@ -273,7 +293,9 @@ function ajax_grab_image_post() {
     // call helper class
     $helper = new grabimage_helper();
 
+    // extract image tag from post_content
     $array = $helper->extract_image($post->post_content);
+
     $search = $replace = [];
     $count = 0;
     if (is_array($array) && count($array) > 0) {
@@ -286,94 +308,30 @@ function ajax_grab_image_post() {
 
             // init file
             $file = array();
-            $file['name'] = $helper->clean_filename(basename($url));
+            $file['name'] = $helper->clean_filename($helper->basename($url));
 
-            // check file exist on hard disk or not
+            // get uploads path
             $time = current_time('mysql');
             if (substr($post->post_date, 0, 4) > 0) {
                 $time = $post->post_date;
             }
             $uploads = wp_upload_dir($time);
-            $filename = $file['name'];
 
-            // check if image exist
-            if (!file_exists($uploads['path']. '/'. $filename)) {
+            // check if image exist on hard disk
+            if (!file_exists($uploads['path']. '/'. $file['name'])) {
                 $exist = false;
 
-                // build up array like PHP file upload
-                $file['file'] = $uploads['path']. '/'. $file['name'];
-                $filetype = wp_check_filetype($file['file']);
-                $file['type'] = $filetype['type'];
-                $file['tmp_name'] = download_url($helper->reencode_url($url));
-                $file['error'] = 0;
-
-                // check ignore file
-                $ignore = false;
-
-                // ignore 404 file
-                if (is_wp_error($file['tmp_name'])) {
-                    @unlink($file['tmp_name']);
-                    $ignore = true;
-                    // return new WP_Error('grabfromurl', 'Could not download image from remote source');
-                }
-
-                // ignore empty file
-                if (!$ignore) {
-                    $file['size'] = filesize($file['tmp_name']);
-                    if ($file['size'] <= 0) {
-                        $ignore = true;
-                    }
-                }
-
-                // continue if ignore
-                if ($ignore) {
-                    echo "error ; {$url} <br/>";
-                    continue;
-                }
-
                 // sideload image
-                $attachmentId = media_handle_sideload($file, $post->ID);
+                $attachment_id = $helper->media_handle_sideload($url, $post->ID);
             } else {
                 $exist = true;
 
-                // insert to db
-                $file['file'] = $uploads['path']. '/'. $file['name'];
-                $file['url'] = $uploads['url'] . "/$filename";
-                $filetype = wp_check_filetype($file['file']);
-                $file['type'] = $filetype['type'];
-                $file['error'] = 0;
-
-                $type = $file['type'];
-                $file = $file['file'];
-                $title = preg_replace('/\.[^.]+$/', '', basename($file));
-                $content = '';
-
-                // Use image exif/iptc data for title and caption defaults if possible.
-                if ( $image_meta = @wp_read_image_metadata($file) ) {
-                    if ( trim( $image_meta['title'] ) && ! is_numeric( sanitize_title( $image_meta['title'] ) ) )
-                        $title = $image_meta['title'];
-                    if ( trim( $image_meta['caption'] ) )
-                        $content = $image_meta['caption'];
-                }
-
-                // Construct the attachment array.
-                $attachment = array(
-                    'post_mime_type' => $type,
-                    'guid' => $url,
-                    'post_parent' => $post->ID,
-                    'post_title' => $title,
-                    'post_content' => $content,
-                );
-
-                // This should never be set as it would then overwrite an existing attachment.
-                unset( $attachment['ID'] );
-
-                // Save the attachment metadata
-                $attachmentId = wp_insert_attachment($attachment, $file, $post->ID);
+                // insert attachment
+                $attachment_id = $helper->media_insert_sideload($url, $post->ID);
             }
 
             // ignore if it has any error
-            if (is_wp_error($attachmentId)) {
+            if (is_wp_error($attachment_id)) {
                 continue;
             }
 
@@ -381,18 +339,19 @@ function ajax_grab_image_post() {
             $search[] = $tag;
 
             // replace with
-            $image = wp_get_attachment_image_src($attachmentId, 'full');
-            $id = $attachmentId;
+            $image = wp_get_attachment_image_src($attachment_id, 'full');
+            $id = $attachment_id;
             $src = $image[0];
             $replace[] = "<a href=\"{$src}\" rel=\"attachment wp-att-{$id}\">"
                 . "<img class=\"alignnone size-full wp-image-{$id}\" src=\"{$src}\" alt=\"{$post->post_title}\" />"
                 . "</a>";
 
+            // return message
             $exist = ($exist ? 'did exist' : 'didn\'t exist');
-            echo "<a href=\"".get_edit_post_link($attachmentId)."\">{$url}</a> was successfully uploaded. It <b>{$exist}</b> already.<br/>";
+            echo "<a href=\"".get_edit_post_link($attachment_id)."\">{$url}</a> was successfully uploaded. It <b>{$exist}</b> already.<br/>";
         }
 
-        // update post data
+        // update post data search | replace
         if (count($search) > 0 && count($replace) > 0) {
             $post_content = str_replace($search, $replace, $post->post_content);
             $my_post = [
@@ -423,13 +382,16 @@ function ajax_attach_image_post() {
     // call helper class
     $helper = new grabimage_helper();
 
+    // extract image tag from post content
     $array = $helper->extract_image($post->post_content, false);
+
     $search = $replace = [];
     $count = 0;
     if (is_array($array) && count($array) > 0) {
         foreach ($array as $tag => $url) {
-            $attachmentId = $helper->get_attachment_id($url);
-            if (empty($attachmentId)) {
+            // get attachment ID from url
+            $attachment_id = $helper->get_attachment_id($url);
+            if (empty($attachment_id)) {
                 continue;
             }
 
@@ -437,12 +399,12 @@ function ajax_attach_image_post() {
             $attachments = get_attached_media('image', $post->ID);
 
             // ignore if image was attachment
-            if (isset($attachments[$attachmentId])) {
+            if (isset($attachments[$attachment_id])) {
                 continue;
             }
 
             wp_update_post([
-                'ID' => $attachmentId,
+                'ID' => $attachment_id,
                 'post_parent' => $post->ID,
             ]);
 
@@ -450,14 +412,14 @@ function ajax_attach_image_post() {
             $search[] = $tag;
 
             // replace with
-            $image = wp_get_attachment_image_src($attachmentId, 'full');
-            $id = $attachmentId;
+            $image = wp_get_attachment_image_src($attachment_id, 'full');
+            $id = $attachment_id;
             $src = $image[0];
             $replace[] = "<a href=\"{$src}\" rel=\"attachment wp-att-{$id}\">"
                 . "<img class=\"alignnone size-full wp-image-{$id}\" src=\"{$src}\" alt=\"{$post->post_title}\" />"
                 . "</a>";
 
-            echo "success ; {$url} ; {$attachmentId} <br/>";
+            echo "success ; {$url} ; {$attachment_id} <br/>";
         }
 
         // update post data
@@ -473,7 +435,7 @@ function ajax_attach_image_post() {
         $count = count($search);
     }
 
-    echo 'Attach '. $count. ' image';
+    echo 'Attached '. $count. ' image';
     wp_die();
 }
 
@@ -490,7 +452,9 @@ function ajax_search_image_post() {
     // call helper class
     $helper = new grabimage_helper();
 
+    // extract image tag from post_content
     $array = $helper->extract_image($post->post_content, false);
+
     $search = $replace = [];
     $count = 0;
     if (is_array($array) && count($array) > 0) {
@@ -518,16 +482,16 @@ function ajax_search_image_post() {
         $count = count($search);
     }
 
-    echo 'Search / Replace '. $count. ' image';
+    echo 'Searched / Replaced '. $count. ' image';
     wp_die();
 }
 
 /**
  * @package grab-image
- * ajax function to restore old feature images of frutimian.no
+ * ajax function to restore old featured images of frutimian.no
  */
 function ajax_restore_feature_image() {
-    $old = $new = '';
+    $original_url = '';
 
     $id = intval($_REQUEST['id']);
     $post = get_post($id);
@@ -536,15 +500,26 @@ function ajax_restore_feature_image() {
         wp_die();
     }
 
+    // current featured image
+    $current_url = get_the_post_thumbnail_url($post->ID, 'full');
+
+    // call helper class
     $helper = new grabimage_helper();
+
+    // get original thumbnail array
     $thumbnail = $helper->get_old_thumbnail();
+
     if (isset($thumbnail[$id])) {
         $thumb = $thumbnail[$id];
-        if (!empty($thumb['attachment_url'])) {
-            // old feature image url
-            $old = $thumb['attachment_url'];
-            $attachment_id = $helper->get_attachment_id($thumb['attachment_url']);
-            if (!empty($attachment_id)) {
+
+        // original featured image url
+        $original_url = $thumb['attach_url'];
+        if (!empty($thumb)) {
+            $attachment_id = $helper->get_attachment_id($original_url);
+            if (empty($attachment_id)) {
+                $attachment_id = $helper->media_handle_sideload($original_url, $id);
+            }
+            if (!is_wp_error($attachment_id)) {
                 set_post_thumbnail($post, $attachment_id);
             }
         }
@@ -553,30 +528,21 @@ function ajax_restore_feature_image() {
     // check post thumbnail exist or not
     $helper->set_post_thumbnail($post->ID);
 
-    // new feature image url
-    $new = get_the_post_thumbnail_url($id);
+    // new featured image url
+    $new_url = get_the_post_thumbnail_url($id, 'full');
 
-    if (empty($old)) {
-        if (empty($new)) {
-            echo 'No feature image was added';
+    if (empty($current_url)) {
+        if (empty($new_url)) {
+            echo '<span class="label label-danger">Error</span> no featured image was added';
         } else {
-            echo $new;
-            echo '<br/>';
-            echo 'Success adding';
+            echo '<span class="label label-success">Success</span> featured image was added';
         }
     } else {
-        if (empty($new)) {
-            echo 'No feature image was added';
+        if ($helper->compare_basename($original_url, $current_url)) {
+            echo 'Nothing to do';
         } else {
-            echo $new;
-            echo '<br/>';
-            if (basename($old) == basename($new)) {
-                echo 'Same feature images';
-            } else {
-                echo 'Success restoring';
-            }
+            echo '<span class="label label-success">Success</span> featured image was restored';
         }
-
     }
 
     wp_die();
