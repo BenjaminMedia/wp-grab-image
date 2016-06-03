@@ -233,8 +233,10 @@ function grab_image_run() {
                         <?php
                         foreach ($posts as $i => $post) {
                             $original_url = '';
-                            if ($action == 'restore' && !isset($thumbnail[$post->ID])) {
-                                continue;
+                            if ($action == 'restore') {
+                                if (!isset($thumbnail[$post->ID]) || empty($thumbnail[$post->ID]['attach_url'])) {
+                                    continue;
+                                }
                             }
                             ?>
                             <tr>
