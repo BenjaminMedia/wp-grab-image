@@ -279,7 +279,7 @@ class grabimage_helper
     }
 
     /**
-     * set thumbnail for post from attachmentS
+     * set thumbnail for post from attachments
      * @param $id
      */
     public function set_post_thumbnail($id)
@@ -404,7 +404,7 @@ class grabimage_helper
 
         // continue if ignore
         if ($ignore) {
-            echo "error ; {$url} <br/>";
+            echo "error ; <a href='{$url}'>{$url}</a> <br/>";
             return false;
         }
 
