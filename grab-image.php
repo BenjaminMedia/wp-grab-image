@@ -1,9 +1,9 @@
 <?php
 /**
  * @package grab-image
- * Plugin Name: grab-image
- * Version: 1.2
- * Description: Grabs images of img tags are re-uploads them to be located on the site.
+ * Plugin Name: Grab Image
+ * Version: 1.3
+ * Description: Grab images of img tags are re-uploads them to be located on the site.
  * Author: Niteco
  * Author URI: http://niteco.se/
  * Plugin URI: PLUGIN SITE HERE
@@ -11,7 +11,7 @@
  * Domain Path: /languages
  */
 
-define('ALLOW_UNFILTERED_UPLOADS', true);
+defined('ALLOW_UNFILTERED_UPLOADS') or define('ALLOW_UNFILTERED_UPLOADS', true);
 
 // no limit time
 ini_set('max_execution_time', 300);
@@ -31,7 +31,7 @@ require_once dirname(__FILE__). '/helper.php';
  * define new menu page parameters
  */
 function grab_image_page() {
-    add_menu_page( 'Grab images', 'Grab images', 'activate_plugins', 'grab-image', 'grab_image_run', '');
+    add_menu_page( 'Grab Image', 'Grab Image', 'activate_plugins', 'grab-image', 'grab_image_run', '');
 }
 
 /**
@@ -97,6 +97,11 @@ function grab_image_run() {
             .nav-link {
                 cursor: pointer !important;
             }
+            #box-status {
+                position: fixed;
+                right: 10px;
+                top: 40px;
+            }
             .fa-refresh-animate {
                 -animation: spin .7s infinite linear;
                 -webkit-animation: spin2 .7s infinite linear;
@@ -136,6 +141,7 @@ function grab_image_run() {
                         jQuery(document).ready(function () {
                             var post = jQuery(".post");
                             var index = -1;
+                            var count = -1;
 
                             /**
                              * click stop button
@@ -148,11 +154,15 @@ function grab_image_run() {
                              * click start button
                              */
                             jQuery('#button-start').click(function () {
+                                if (count < post.length) {
+                                    index = count;
+                                }
                                 function doNext() {
                                     if (++index >= post.length) {
                                         jQuery('#box-status').hide();
                                         return;
                                     } else {
+                                        count = index;
                                         jQuery('#box-status').show();
                                     }
 
@@ -170,6 +180,9 @@ function grab_image_run() {
                                     <?php if ($action == 'restore') { ?>
                                     var restore = jQuery('#restore-' + id);
                                     if (restore.attr('status') != 'diff') {
+                                        if (restore.attr('status') == 'same') {
+                                            jQuery('#result-' + id).html('Nothing to do');
+                                        }
                                         doNext();
                                         return;
                                     }
@@ -216,7 +229,7 @@ function grab_image_run() {
                     <table class="table table-striped">
                         <tr>
                             <th colspan="5">
-                                <button class="btn btn-primary" id="button-start">Start</button>
+                                <button class="btn btn-success" id="button-start">Start</button>
                                 <button class="btn btn-danger" id="button-stop">Stop</button>
                             </th>
                         </tr>
@@ -231,6 +244,7 @@ function grab_image_run() {
                         <tr>
                             <th>#</th>
                             <th>Post</th>
+                            <th>Run</th>
                             <?php if ($action == 'restore') { ?>
                                 <th>Featured image</th>
                                 <th>Status</th>
@@ -250,6 +264,9 @@ function grab_image_run() {
                             <tr>
                                 <td><?php echo ($i + 1); ?></td>
                                 <td class="post" rel="<?php echo $post->ID; ?>"><a href="<?php echo get_edit_post_link($post->ID); ?>" target="_blank"><?php echo $post->ID; ?></a></td>
+                                <td>
+                                    <a target="_blank" class="btn btn-success" href="admin-ajax.php?action=<?php echo $action; ?>_image&id=<?php echo $post->ID; ?>">Run</a>
+                                </td>
                                 <?php
                                 if ($action == 'restore') {
                                     echo '<td>';
@@ -376,7 +393,7 @@ function ajax_grab_image_post() {
 
             // return message
             $exist = ($exist ? 'did exist' : 'didn\'t exist');
-            echo "<a href=\"".get_edit_post_link($attachment_id)."\">{$url}</a> was successfully uploaded. It <b>{$exist}</b> already.<br/>";
+            echo "<a href=\"".get_edit_post_link($attachment_id)."\">{$url}</a> <b>{$exist}</b> already.<br/>";
         }
 
         // update post data search | replace
