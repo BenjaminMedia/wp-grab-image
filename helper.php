@@ -9,11 +9,23 @@ class grabimage_helper
      *
      * @return mixed
      */
-    public function basename($url)
-    {
+    public function basename($url) {
         $temp = explode('/', $url);
 
         return $temp[count($temp) - 1];
+    }
+
+    /**
+     * basepath function for utf8
+     * @param $url
+     *
+     * @return string
+     */
+    public function basepath($url) {
+        $i    = strpos( $url, "/uploads" );
+        $str  = substr( $url, $i + 9);
+
+        return $str;
     }
 
     /**
@@ -21,8 +33,7 @@ class grabimage_helper
      * @param $url
      * @return string
      */
-    public function reconstruct_url($url)
-    {
+    public function reconstruct_url($url) {
         $url_parts = parse_url($url);
         $constructed_url = $url_parts['scheme'] . '://' . $url_parts['host'] . $url_parts['path'];
 
@@ -34,8 +45,7 @@ class grabimage_helper
      * @param $url
      * @return mixed
      */
-    public function reencode_url($url)
-    {
+    public function reencode_url($url) {
         $temp = explode('/', $url);
         $temp2 = $temp[count($temp) - 1];
         $temp[count($temp) - 1] = urlencode($temp2);
@@ -44,11 +54,11 @@ class grabimage_helper
     }
 
     /**
-     * make filename clean
+     * make basename clean
      * @param $file
      * @return string
      */
-    public function clean_filename($file) {
+    public function clean_basename($file) {
         $path = pathinfo($file);
         if (isset($path['extension'])) {
             $new_filename = preg_replace('/.' . $path['extension'] . '$/', '', $file);
@@ -59,12 +69,31 @@ class grabimage_helper
     }
 
     /**
+     * make basepath clean
+     * @param $basepath
+     *
+     * @return string
+     */
+    public function clean_basepath($basepath) {
+        $tmp = explode('/', $basepath);
+
+        $file = $tmp[count($tmp) - 1];
+        $path = pathinfo($file);
+        if (isset($path['extension'])) {
+            $new_filename = preg_replace('/.' . $path['extension'] . '$/', '', $file);
+            $file = substr(sanitize_title($new_filename), 0, 128) . '.' . $path['extension'];
+        }
+        $tmp[count($tmp) - 1] = $file;
+
+        return implode('/', $tmp);
+    }
+
+    /**
      * check if image url exist or not
      * @param $url
      * @return bool
      */
-    public function exist_filename($url)
-    {
+    public function exist_filename($url) {
         $tmp = download_url($this->reencode_url($url));
         if (!is_wp_error($tmp)) {
             @unlink($tmp);
@@ -80,8 +109,7 @@ class grabimage_helper
      * @param $file
      * @return string
      */
-    public function real_filename($file)
-    {
+    public function real_filename($file) {
         // remove size string
         if (preg_match("/^(https?:\/\/.*)\-[0-9]+x[0-9]+\.(jpg|jpeg|png)$/", $file, $m)) {
             $url = $m[1].'.'.$m[2];
@@ -102,10 +130,9 @@ class grabimage_helper
      *
      * @return bool
      */
-    public function compare_basename($first, $second)
-    {
-        $first = $this->clean_filename($this->basename(trim($first)));
-        $second = $this->clean_filename($this->basename(trim($second)));
+    public function compare_basename($first, $second) {
+        $first = $this->clean_basename($this->basename(trim($first)));
+        $second = $this->clean_basename($this->basename(trim($second)));
 
         return ($first == $second);
     }
@@ -140,7 +167,7 @@ class grabimage_helper
                     continue;
                 }
 
-                // ignore niteco image
+                // ignore local image
                 if (strpos($url, $_SERVER['SERVER_NAME']) !== false) {
                     continue;
                 }
@@ -175,8 +202,8 @@ class grabimage_helper
             }
         }
 
-        $file = $this->basename($url);
-        $file2 = $this->clean_filename($file);
+        $file = $this->basepath($url);
+        $file2 = $this->clean_basepath($file);
         $query_args = array(
             'post_type'   => 'attachment',
             'post_status' => 'inherit',
@@ -216,8 +243,7 @@ class grabimage_helper
      * generate json file for mapping data
      * @throws Exception
      */
-    public function get_old_thumbnail()
-    {
+    public function get_old_thumbnail() {
         /**************************************************
         $file = dirname(__FILE__). "/frutimian.wordpress.xml";
         if (file_exists($file)) {
@@ -282,8 +308,7 @@ class grabimage_helper
      * set thumbnail for post from attachments
      * @param $id
      */
-    public function set_post_thumbnail($id)
-    {
+    public function set_post_thumbnail($id) {
         $thumbnail_url = get_the_post_thumbnail_url($id, 'full');
         if (!$thumbnail_url) {
             $attachments = get_attached_media('image', $id);
@@ -363,8 +388,7 @@ class grabimage_helper
      *
      * @return bool|int|object
      */
-    public function media_handle_sideload($url, $post_id)
-    {
+    public function media_download_sideload($url, $post_id) {
         $post = get_post($post_id);
 
         // check file exist on hard disk or not
@@ -375,7 +399,7 @@ class grabimage_helper
         $uploads = wp_upload_dir($time);
 
         $file = array();
-        $file['name'] = $this->clean_filename($this->basename($url));
+        $file['name'] = $this->clean_basename($this->basename($url));
 
         // build up array like PHP file upload
         $file['file'] = $uploads['path']. '/'. $file['name'];
@@ -404,7 +428,7 @@ class grabimage_helper
 
         // continue if ignore
         if ($ignore) {
-            echo "error ; <a href='{$url}'>{$url}</a> <br/>";
+            echo "error ; <a href='{$url}'>{$url}</a><br/>";
             return false;
         }
 
@@ -422,8 +446,7 @@ class grabimage_helper
      *
      * @return int
      */
-    public function media_insert_sideload($url, $post_id)
-    {
+    public function media_update_sideload($url, $post_id) {
         $post = get_post($post_id);
 
         // check file exist on hard disk or not
@@ -435,7 +458,7 @@ class grabimage_helper
 
         // insert to db
         $file = array();
-        $file['name'] = $this->clean_filename($this->basename($url));
+        $file['name'] = $this->clean_basename($this->basename($url));
         $file['file'] = $uploads['path']. '/'. $file['name'];
         $file['url'] = $uploads['url']. '/'. $file['name'];
         $filetype = wp_check_filetype($file['file']);
@@ -447,7 +470,7 @@ class grabimage_helper
         $title = preg_replace('/\.[^.]+$/', '', $this->basename($file));
         $content = '';
 
-        // Use image exif/iptc data for title and caption defaults if possible.
+        // use image exif/iptc data for title and caption defaults if possible.
         if ($image_meta = @wp_read_image_metadata($file)) {
             if (trim($image_meta['title']) && !is_numeric(sanitize_title($image_meta['title'])))
                 $title = $image_meta['title'];
@@ -455,7 +478,7 @@ class grabimage_helper
                 $content = $image_meta['caption'];
         }
 
-        // Construct the attachment array.
+        // construct the attachment array.
         $attachment = array(
             'post_mime_type' => $type,
             'guid' => $url,
@@ -464,13 +487,32 @@ class grabimage_helper
             'post_content' => $content,
         );
 
-        // This should never be set as it would then overwrite an existing attachment.
+        // this should never be set as it would then overwrite an existing attachment.
         unset($attachment['ID']);
 
-        // Save the attachment metadata
+        // save the attachment metadata
         $attachment_id = wp_insert_attachment($attachment, $file, $post->ID);
 
+        // update attachment metadata
+        if ( !is_wp_error($attachment_id) )
+            wp_update_attachment_metadata( $attachment_id, wp_generate_attachment_metadata( $attachment_id, $file ) );
+
         return $attachment_id;
+    }
+
+    /**
+     * get original image url when you move to new host
+     * @param $url
+     * @param $original_host
+     *
+     * @return string
+     */
+    public function original_image_url( $url, $original_host ) {
+        $i    = strpos( $url, "/uploads" );
+        $part = substr( $url, $i );
+        $return = $original_host . $part;
+
+        return $return;
     }
 }
 
