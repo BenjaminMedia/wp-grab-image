@@ -2,7 +2,7 @@
 /**
  * @package grab-image
  * Plugin Name: Grab Image
- * Version: 1.4
+ * Version: 1.6
  * Description: Grab images of img tags are re-uploads them to be located on the site.
  * Author: Niteco
  * Author URI: http://niteco.se/
@@ -23,10 +23,10 @@ add_action('wp_ajax_download_image'     , 'ajax_download_image_post'        );
 add_action('wp_ajax_grab_image'         , 'ajax_grab_image_post'            );
 add_action('wp_ajax_attach_image'       , 'ajax_attach_image_post'          );
 add_action('wp_ajax_search_image'       , 'ajax_search_image_post'          );
-add_action('wp_ajax_restore_image'      , 'ajax_restore_feature_image'      );
+add_action('wp_ajax_restore_image'      , 'ajax_restore_featured_image'      );
 
 // require helper
-require_once dirname(__FILE__). '/helper.php';
+require_once dirname(__FILE__). '/libs/helper.php';
 
 /**
  * define new menu page parameters
@@ -53,6 +53,10 @@ function grab_image_run() {
 function ajax_download_image_post() {
     $id = intval($_REQUEST['id']);
     $post = get_post($id);
+    if (empty($post)) {
+        echo 'Wrong post ID';
+        wp_die();
+    }
 
     // call helper class
     $helper = new grabimage_helper();
@@ -143,6 +147,10 @@ function ajax_download_image_post() {
 function ajax_grab_image_post() {
     $id = intval($_REQUEST['id']);
     $post = get_post($id);
+    if (empty($post)) {
+        echo 'Wrong post ID';
+        wp_die();
+    }
 
     // call helper class
     $helper = new grabimage_helper();
@@ -237,6 +245,10 @@ function ajax_grab_image_post() {
 function ajax_attach_image_post() {
     $id = intval($_REQUEST['id']);
     $post = get_post($id);
+    if (empty($post)) {
+        echo 'Wrong post ID';
+        wp_die();
+    }
 
     // call helper class
     $helper = new grabimage_helper();
@@ -305,6 +317,11 @@ function ajax_attach_image_post() {
 function ajax_search_image_post() {
     $id = intval($_REQUEST['id']);
     $post = get_post($id);
+    if (empty($post)) {
+        echo 'Wrong post ID';
+        wp_die();
+    }
+
     $search_str = (string) $_REQUEST['search'];
     $replace_str = (string) $_REQUEST['replace'];
 
@@ -347,60 +364,55 @@ function ajax_search_image_post() {
 
 /**
  * @package grab-image
- * ajax function to restore old featured images of frutimian.no
+ * ajax function to restore old featured images
  */
-function ajax_restore_feature_image() {
-    $original_url = '';
-
-    $id = intval($_REQUEST['id']);
-    $post = get_post($id);
+function ajax_restore_featured_image() {
+    $post_id = intval($_REQUEST['id']);
+    $post = get_post($post_id);
     if (empty($post)) {
         echo 'Wrong post ID';
         wp_die();
     }
 
-    // current featured image
-    $current_url = get_the_post_thumbnail_url($post->ID, 'full');
-
     // call helper class
     $helper = new grabimage_helper();
 
-    // get original thumbnail array
-    $thumbnail = $helper->get_old_thumbnail();
+    // original featured image url
+    $original_url = urldecode($_REQUEST['url']);
 
-    if (isset($thumbnail[$id])) {
-        $thumb = $thumbnail[$id];
+    // current featured image url
+    $current_url = get_the_post_thumbnail_url($post_id, 'full');
 
-        // original featured image url
-        $original_url = $thumb['attach_url'];
-        if (!empty($thumb)) {
-            $attachment_id = $helper->get_attachment_id($original_url);
-            if (empty($attachment_id)) {
-                $attachment_id = $helper->media_handle_sideload($original_url, $id);
-            }
-            if (!is_wp_error($attachment_id)) {
-                set_post_thumbnail($post, $attachment_id);
-            }
-        }
+    // get attachment_id from original featured image url
+    $attachment_id = $helper->get_attachment_id($original_url);
+
+    // if empty the download
+    if (empty($attachment_id)) {
+        $attachment_id = $helper->media_download_sideload($original_url, $post_id);
+    }
+
+    // if correct then set as post featured image
+    if (!is_wp_error($attachment_id)) {
+        set_post_thumbnail($post, $attachment_id);
     }
 
     // check post thumbnail exist or not
     $helper->set_post_thumbnail($post->ID);
 
     // new featured image url
-    $new_url = get_the_post_thumbnail_url($id, 'full');
+    $new_url = get_the_post_thumbnail_url($post_id, 'full');
 
-    if (empty($current_url)) {
-        if (empty($new_url)) {
-            echo '<span class="label label-danger">Error</span> no featured image was added';
-        } else {
-            echo '<span class="label label-success">Success</span> featured image was added';
-        }
+    if (empty($new_url)) {
+        echo '<span class="label label-danger">Error</span> no featured image was added';
     } else {
-        if ($helper->compare_basename($original_url, $current_url)) {
+        if ($helper->compare_basename($current_url, $new_url)) {
             echo 'Nothing to do';
         } else {
-            echo '<span class="label label-success">Success</span> featured image was restored';
+            if (empty($current_url)) {
+                echo '<span class="label label-success">Success</span> featured image was added';
+            } else {
+                echo '<span class="label label-success">Success</span> featured image was restored';
+            }
         }
     }
 

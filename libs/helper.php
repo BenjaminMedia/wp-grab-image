@@ -1,5 +1,7 @@
 <?php
+require_once dirname(__FILE__). '/simple_html_dom.php';
 require_once dirname(__FILE__). '/snoopy.class.php';
+require_once dirname(__FILE__). '/XML2Array.php';
 
 class grabimage_helper
 {
@@ -124,7 +126,7 @@ class grabimage_helper
     }
 
     /**
-     * compare basename of original and current featured images
+     * compare basename of original and current images
      * @param $first
      * @param $second
      *
@@ -133,6 +135,20 @@ class grabimage_helper
     public function compare_basename($first, $second) {
         $first = $this->clean_basename($this->basename(trim($first)));
         $second = $this->clean_basename($this->basename(trim($second)));
+
+        return ($first == $second);
+    }
+
+    /**
+     * compare basepath of original and current images
+     * @param $first
+     * @param $second
+     *
+     * @return bool
+     */
+    public function compare_basepath($first, $second) {
+        $first = $this->clean_basepath($this->basepath(trim($first)));
+        $second = $this->clean_basepath($this->basepath(trim($second)));
 
         return ($first == $second);
     }
@@ -202,8 +218,8 @@ class grabimage_helper
             }
         }
 
-        $file = $this->basepath($url);
-        $file2 = $this->clean_basepath($file);
+        $file = $this->basename($url);
+        $file2 = $this->clean_basename($file);
         $query_args = array(
             'post_type'   => 'attachment',
             'post_status' => 'inherit',
@@ -241,10 +257,12 @@ class grabimage_helper
 
     /**
      * generate json file for mapping data
-     * @throws Exception
+     * @param $site
+     *
+     * @return array|mixed|object
      */
-    public function get_old_thumbnail() {
-        /**************************************************
+    public function get_old_thumbnail($site) {
+        /***** frutimain.no blog
         $file = dirname(__FILE__). "/frutimian.wordpress.xml";
         if (file_exists($file)) {
             require_once dirname( __FILE__ ) . '/XML2Array.php';
@@ -290,18 +308,43 @@ class grabimage_helper
                 }
             }
 
-            file_put_contents(dirname(__FILE__). '/thumbnail.json', json_encode($thumbnail));
+            file_put_contents(dirname(__FILE__). '/thumbnail_fru.json', json_encode($thumbnail));
         }
-        /**************************************************/
+        *****/
 
-        $file = dirname(__FILE__) . '/thumbnail.json';
+        /*****
+        $domain = 'http://sarahlouise.dk';
+        $home_url = get_home_url();
+
+        $total = 6105;
+        $limit = 300;
+        $page = floor($total / $limit) + 1;
+        for ($i = 1; $i <= $page; $i++) {
+            $html = file_get_html($domain. '/page/'. $i);
+            foreach ($html->find('.entry-thumbnail') as $j => $entry) {
+                if ($j > $limit) {
+                    break;
+                }
+                $href = $entry->find('a', 0)->href;
+                $src = $entry->find('img', 0)->src;
+                $array[$href] = $src;
+            }
+        }
+        $json = json_encode($array);
+        file_put_contents(dirname(__FILE__). '/json/sarahlouise.json', $json);
+        *****/
+
+        if ($site == 'frut') {
+            $file = dirname(__FILE__) . '/../json/frutimian.json';
+        } else {
+            $file = dirname(__FILE__) . '/../json/thumbnail.json';
+        }
         if (file_exists($file)) {
             $json = file_get_contents($file);
             return json_decode($json, true);
         } else {
             return array();
         }
-
     }
 
     /**
@@ -324,13 +367,11 @@ class grabimage_helper
 
     /**
      * Download an url to local using snoopy class
-     *
      * @param $url
-     * @param int $timeout
      *
      * @return string|WP_Error
      */
-    public function download_url( $url, $timeout = 300 ) {
+    public function download_url( $url) {
         //WARNING: The file is not automatically deleted, The script must unlink() the file.
         if (! $url)
             return new WP_Error('http_no_url', __('Invalid URL Provided.'));
@@ -507,10 +548,24 @@ class grabimage_helper
      *
      * @return string
      */
-    public function original_image_url( $url, $original_host ) {
+    public function get_original_image_url( $url, $original_host ) {
         $i    = strpos( $url, "/uploads" );
         $part = substr( $url, $i );
         $return = $original_host . $part;
+
+        return $return;
+    }
+
+    /**
+     * get original post url when you move to new host
+     * @param $url
+     * @param $original_host
+     *
+     * @return string
+     */
+    public function get_original_post_url($url, $original_host) {
+        $home_url = get_home_url();
+        $return = $original_host . str_replace($home_url, '', $url);
 
         return $return;
     }
