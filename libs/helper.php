@@ -218,8 +218,9 @@ class grabimage_helper
             }
         }
 
-        $file = $this->basename($url);
-        $file2 = $this->clean_basename($file);
+        // check by basepath first
+        $file = $this->basepath($url);
+        $file2 = $this->clean_basepath($file);
         $query_args = array(
             'post_type'   => 'attachment',
             'post_status' => 'inherit',
