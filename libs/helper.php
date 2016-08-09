@@ -184,9 +184,9 @@ class grabimage_helper
                 }
 
                 // ignore local image
-                if (strpos($url, $_SERVER['SERVER_NAME']) !== false) {
+                /*if (strpos($url, $_SERVER['SERVER_NAME']) !== false) {
                     continue;
-                }
+                }*/
 
                 // ignore relative image
                 if (strpos($url, 'http') === false) {
@@ -219,8 +219,10 @@ class grabimage_helper
         }
 
         // check by basepath first
-        $file = $this->basepath($url);
-        $file2 = $this->clean_basepath($file);
+        $path = $this->basepath($url);
+        $path2 = $this->clean_basepath($path);
+        $file = basename($path);
+        $file2 = basename($path2);
         $query_args = array(
             'post_type'   => 'attachment',
             'post_status' => 'inherit',
@@ -228,12 +230,12 @@ class grabimage_helper
             'meta_query'  => array(
                 'relation' => 'OR',
                 array(
-                    'value'   => $file,
+                    'value'   => $path,
                     'compare' => 'LIKE',
                     'key'     => '_wp_attachment_metadata',
                 ),
                 array(
-                    'value'   => $file2,
+                    'value'   => $path2,
                     'compare' => 'LIKE',
                     'key'     => '_wp_attachment_metadata',
                 ),
@@ -243,10 +245,12 @@ class grabimage_helper
         if ( $query->have_posts() ) {
             foreach ( $query->posts as $post_id ) {
                 $meta = wp_get_attachment_metadata( $post_id );
-                $original_file       = $this->basename( $meta['file'] );
+                $original_file       = basename( $meta['file'] );
                 $cropped_image_files = wp_list_pluck( $meta['sizes'], 'file' );
-                if (   $original_file === $file  || in_array($file , $cropped_image_files)
-                    || $original_file === $file2 || in_array($file2, $cropped_image_files)) {
+                if (    $file == $original_file
+                    ||  in_array($file , $cropped_image_files)
+                    ||  $file2 == $original_file
+                    ||  in_array($file2, $cropped_image_files)  ) {
                     $attachment_id = $post_id;
                     break;
                 }
@@ -349,21 +353,46 @@ class grabimage_helper
     }
 
     /**
+     *
      * set thumbnail for post from attachments
      * @param $id
+     *
+     * @return bool
      */
     public function set_post_thumbnail($id) {
         $thumbnail_url = get_the_post_thumbnail_url($id, 'full');
-        if (!$thumbnail_url) {
+        $has_thumb = false;
+
+        // check thumbnail empty or not
+        if (!empty($thumbnail_url)) {
+            // check file thumbnail exist or not
+            if (!$this->exist_filename($thumbnail_url)) {
+                $attachment_id = $this->get_attachment_id($thumbnail_url);
+                if (!empty($attachment_id)) {
+                    set_post_thumbnail($id, $attachment_id);
+                    $has_thumb = true;
+                }
+            } else {
+                $has_thumb = true;
+            }
+        }
+
+        // post does not have thumbnail or thumbnail has error
+        // set first attachment as thumbnail
+        if (!$has_thumb) {
             $attachments = get_attached_media('image', $id);
             if (count($attachments) > 0) {
                 ksort($attachments);
                 foreach ($attachments as $key => $value) {
-                    set_post_thumbnail($id, $key);
-                    break;
+                    if (set_post_thumbnail($id, $key)) {
+                        $has_thumb = true;
+                        break;
+                    }
                 }
             }
         }
+
+        return $has_thumb;
     }
 
     /**

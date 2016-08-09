@@ -1,7 +1,7 @@
 <?php
 $posts = get_posts([
     'posts_per_page' => -1,
-    'post_status' => 'any',
+    'post_status' => 'publish',
     'orderby' => 'ID',
     'order'   => 'DESC',
     'post_type' => 'post'
@@ -95,14 +95,14 @@ $posts = get_posts([
 </script>
 <table class="table table-striped">
     <tr>
-        <th colspan="5">
+        <th colspan="6">
             <button class="btn btn-success" id="button-start">Start</button>
             <button class="btn btn-danger" id="button-stop">Stop</button>
         </th>
     </tr>
     <?php if ($action == 'search') { ?>
         <tr>
-            <th colspan="4">
+            <th colspan="6">
                 <label for="input-search">Search</label> <input class="input" type="text" id="input-search" />
                 <label for="input-replace">Replace</label> <input class="" type="text" id="input-replace" />
             </th>
@@ -110,7 +110,9 @@ $posts = get_posts([
     <?php } ?>
     <tr>
         <th>#</th>
-        <th>Post</th>
+        <th>ID</th>
+        <th>Title</th>
+        <th>Created</th>
         <th>Run</th>
         <?php if ($action == 'restore_fru') { ?>
             <th>Featured image</th>
@@ -125,6 +127,17 @@ $posts = get_posts([
         <tr>
             <td><?php echo ($i + 1); ?></td>
             <td class="post" rel="<?php echo $post->ID; ?>"><a href="<?php echo get_edit_post_link($post->ID); ?>" target="_blank"><?php echo $post->ID; ?></a></td>
+            <td><a href="<?php echo get_edit_post_link($post->ID); ?>" target="_blank">
+                <?php
+                    $length = 50;
+                    if (strlen($post->post_title) > 50) {
+                        echo substr($post->post_title, 0, 50). ' ...';
+                    } else {
+                        echo $post->post_title;
+                    }
+                ?>
+            </a></td>
+            <td><?php echo $post->post_date_gmt; ?></td>
             <td>
                 <a target="_blank" class="btn btn-success" href="admin-ajax.php?action=<?php echo $action; ?>_image&id=<?php echo $post->ID; ?>">Run</a>
             </td>

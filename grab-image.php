@@ -2,7 +2,7 @@
 /**
  * @package grab-image
  * Plugin Name: Grab Image
- * Version: 1.7
+ * Version: 1.8
  * Description: Grab images of img tags are re-uploads them to be located on the site.
  * Author: Niteco
  * Author URI: http://niteco.se/
@@ -200,6 +200,11 @@ function ajax_grab_image_post() {
                 if (is_wp_error($attachment_id)) {
                     continue;
                 }
+            }
+
+            // ignore if empty attachment_id
+            if (empty($attachment_id)) {
+                continue;
             }
 
             // search a|img tag
