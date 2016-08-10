@@ -2,7 +2,7 @@
 /**
  * @package grab-image
  * Plugin Name: Grab Image
- * Version: 1.8
+ * Version: 1.9
  * Description: Grab images of img tags are re-uploads them to be located on the site.
  * Author: Niteco
  * Author URI: http://niteco.se/
@@ -14,7 +14,7 @@
 defined('ALLOW_UNFILTERED_UPLOADS') or define('ALLOW_UNFILTERED_UPLOADS', true);
 
 // no limit time
-ini_set('max_execution_time', 300);
+ini_set('max_execution_time', 3000);
 error_reporting(E_ERROR);
 
 // start up the engine
@@ -144,7 +144,7 @@ function ajax_download_image_post() {
  * @package grab-image
  * ajax function to grab image
  */
-function ajax_grab_image_post() {
+function ajax_grab_image_post($trigger = false) {
     $id = intval($_REQUEST['id']);
     $post = get_post($id);
     if (empty($post)) {
@@ -239,8 +239,10 @@ function ajax_grab_image_post() {
     // set post thumbnail if not exist
     $helper->set_post_thumbnail($post->ID);
 
-    echo 'Found '. $count. ' new image';
-    wp_die();
+    if (!$trigger) {
+        echo 'Found '. $count. ' new image';
+        wp_die();
+    }
 }
 
 /**
@@ -423,3 +425,14 @@ function ajax_restore_featured_image() {
 
     wp_die();
 }
+
+// trigger save_post
+function grab_image_save_post( $post_id ) {
+    // if this is just a revision, don't do anything
+    if ( wp_is_post_revision( $post_id ) )
+        return;
+
+    $_REQUEST['id'] = $post_id;
+    ajax_grab_image_post(true);
+}
+add_action( 'save_post', 'grab_image_save_post' );
