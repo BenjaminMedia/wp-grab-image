@@ -222,45 +222,48 @@ class grabimage_helper
         $path = $this->basepath($url);
         $path2 = rawurldecode($path);
 
-        // remove s3 key string
-        // 2016/07/09092114/.....jpg --> 2016/07/.....jpg
         $temp = explode('/', $path);
-        if (count($temp) > 3 && is_numeric($temp[2])) {
-            unset($temp[2]);
+        if (count($temp) == 3) {
+            $query_args = array(
+                'post_type'   => 'attachment',
+                'post_status' => 'inherit',
+                'fields'      => 'ids',
+                'meta_query'  => array(
+                    'relation' => 'OR',
+                    array(
+                        'value'   => $path,
+                        'compare' => 'LIKE',
+                        'key'     => '_wp_attachment_metadata',
+                    ),
+                    array(
+                        'value'   => $path2,
+                        'compare' => 'LIKE',
+                        'key'     => '_wp_attachment_metadata',
+                    ),
+                )
+            );
+        } else {
+            $query_args = array(
+                'post_type'   => 'attachment',
+                'post_status' => 'inherit',
+                'fields'      => 'ids',
+                'meta_query'  => array(
+                    'relation' => 'OR',
+                    array(
+                        'value'   => $path,
+                        'compare' => 'LIKE',
+                        'key'     => 'amazonS3_info',
+                    ),
+                    array(
+                        'value'   => $path2,
+                        'compare' => 'LIKE',
+                        'key'     => 'amazonS3_info',
+                    ),
+                )
+            );
         }
-        $path3 = implode('/', $temp);
-        $path4 = rawurldecode($path3);
 
-        $query_args = array(
-            'post_type'   => 'attachment',
-            'post_status' => 'inherit',
-            'fields'      => 'ids',
-            'meta_query'  => array(
-                'relation' => 'OR',
-                array(
-                    'value'   => $path,
-                    'compare' => 'LIKE',
-                    'key'     => '_wp_attachment_metadata',
-                ),
-                array(
-                    'value'   => $path2,
-                    'compare' => 'LIKE',
-                    'key'     => '_wp_attachment_metadata',
-                ),
-                array(
-                    'value'   => $path3,
-                    'compare' => 'LIKE',
-                    'key'     => '_wp_attachment_metadata',
-                ),
-                array(
-                    'value'   => $path4,
-                    'compare' => 'LIKE',
-                    'key'     => '_wp_attachment_metadata',
-                ),
-            )
-        );
         $query = new WP_Query( $query_args );
-
         $file = basename($path);
         $file2 = basename($path2);
 
