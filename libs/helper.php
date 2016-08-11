@@ -220,9 +220,17 @@ class grabimage_helper
 
         // check by basepath first
         $path = $this->basepath($url);
-        $path2 = $this->clean_basepath($path);
-        $file = basename($path);
-        $file2 = basename($path2);
+        $path2 = rawurldecode($path);
+
+        // remove s3 key string
+        // 2016/07/09092114/.....jpg --> 2016/07/.....jpg
+        $temp = explode('/', $path);
+        if (count($temp) > 3 && is_numeric($temp[2])) {
+            unset($temp[2]);
+        }
+        $path3 = implode('/', $temp);
+        $path4 = rawurldecode($path3);
+
         $query_args = array(
             'post_type'   => 'attachment',
             'post_status' => 'inherit',
@@ -239,18 +247,34 @@ class grabimage_helper
                     'compare' => 'LIKE',
                     'key'     => '_wp_attachment_metadata',
                 ),
+                array(
+                    'value'   => $path3,
+                    'compare' => 'LIKE',
+                    'key'     => '_wp_attachment_metadata',
+                ),
+                array(
+                    'value'   => $path4,
+                    'compare' => 'LIKE',
+                    'key'     => '_wp_attachment_metadata',
+                ),
             )
         );
         $query = new WP_Query( $query_args );
+
+        $file = basename($path);
+        $file2 = basename($path2);
+
         if ( $query->have_posts() ) {
             foreach ( $query->posts as $post_id ) {
                 $meta = wp_get_attachment_metadata( $post_id );
                 $original_file       = basename( $meta['file'] );
                 $cropped_image_files = wp_list_pluck( $meta['sizes'], 'file' );
-                if (    $file == $original_file
+                if (
+                    $file == $original_file
                     ||  in_array($file , $cropped_image_files)
                     ||  $file2 == $original_file
-                    ||  in_array($file2, $cropped_image_files)  ) {
+                    ||  in_array($file2 , $cropped_image_files)
+                ) {
                     $attachment_id = $post_id;
                     break;
                 }
@@ -360,6 +384,7 @@ class grabimage_helper
      * @return bool
      */
     public function set_post_thumbnail($id) {
+        $post = get_post($id);
         $thumbnail_url = get_the_post_thumbnail_url($id, 'full');
         $has_thumb = false;
 
@@ -378,16 +403,15 @@ class grabimage_helper
         }
 
         // post does not have thumbnail or thumbnail has error
-        // set first attachment as thumbnail
+        // set first image in post_content as thumbnail
         if (!$has_thumb) {
-            $attachments = get_attached_media('image', $id);
-            if (count($attachments) > 0) {
-                ksort($attachments);
-                foreach ($attachments as $key => $value) {
-                    if (set_post_thumbnail($id, $key)) {
-                        $has_thumb = true;
-                        break;
-                    }
+            $images = $this->extract_image($post->post_content, false);
+            foreach ($images as $tag => $url) {
+                $attachment_id = $this->get_attachment_id($url);
+                if (!empty($attachment_id)) {
+                    set_post_thumbnail($id, $attachment_id);
+                    $has_thumb = true;
+                    break;
                 }
             }
         }
