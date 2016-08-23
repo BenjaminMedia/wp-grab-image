@@ -2,7 +2,7 @@
 /**
  * @package grab-image
  * Plugin Name: Grab Image
- * Version: 2.1
+ * Version: 2.2
  * Description: Grab images of img tags are re-uploads them to be located on the site.
  * Author: Niteco
  * Author URI: http://niteco.se/
@@ -429,10 +429,29 @@ function ajax_restore_featured_image() {
 // trigger save_post
 function grab_image_save_post( $post_id ) {
     // if this is just a revision, don't do anything
-    if ( wp_is_post_revision( $post_id ) )
+    if ( wp_is_post_revision( $post_id ) ) {
         return;
+    }
+
+    // check it's not an auto save routine
+    if ( defined('DOING_AUTOSAVE') && DOING_AUTOSAVE ) {
+        return;
+    }
+        
+
+    // perform permission checks! for example:
+    if ( !current_user_can('edit_post', $post_id) ) {
+        return;
+    }
+
+    // fix loop issue
+    remove_action('save_post', 'grab_image_save_post');
 
     $_REQUEST['id'] = $post_id;
     ajax_grab_image_post(true);
+
+    // rehook save_post
+    add_action( 'save_post', 'grab_image_save_post' );
 }
+
 add_action( 'save_post', 'grab_image_save_post' );
