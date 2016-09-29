@@ -626,6 +626,36 @@ class grabimage_helper
 
         return $return;
     }
+
+    public function media_download($url) {
+        preg_match('/uploads\/([0-9]*)\/([0-9]*)\/[0-9]*\/(.*)/', $url, $m);
+
+        $dir = get_home_path(). "/wp-content/uploads/{$m[1]}/{$m[2]}";
+        $file = get_home_path(). "/wp-content/uploads/{$m[1]}/{$m[2]}/{$m[3]}";
+        $link = home_url(). "/wp-content/uploads/{$m[1]}/{$m[2]}/{$m[3]}";;
+
+        if (!file_exists($dir)) {
+            if (!wp_mkdir_p($dir)) {
+                return false;
+            }
+        }
+
+        // file exists
+        if (file_exists($file)) {
+            return $link;
+        } else {
+            $tmp = download_url($url);
+            if (!is_wp_error($tmp)) {
+                if (rename($tmp, $file)) {
+                    return $link;
+                } else {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        }
+    }
 }
 
 /**************************************************

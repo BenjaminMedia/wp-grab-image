@@ -2,7 +2,7 @@
 /**
  * @package grab-image
  * Plugin Name: Grab Image
- * Version: 2.2
+ * Version: 2.3
  * Description: Grab images of img tags are re-uploads them to be located on the site.
  * Author: Niteco
  * Author URI: http://niteco.se/
@@ -19,11 +19,11 @@ error_reporting(E_ERROR);
 
 // start up the engine
 add_action('admin_menu'                 , 'grab_image_page'                 );
-add_action('wp_ajax_download_image'     , 'ajax_download_image_post'        );
+add_action('wp_ajax_download_image'     , 'ajax_download_image'             );
 add_action('wp_ajax_grab_image'         , 'ajax_grab_image_post'            );
 add_action('wp_ajax_attach_image'       , 'ajax_attach_image_post'          );
 add_action('wp_ajax_search_image'       , 'ajax_search_image_post'          );
-add_action('wp_ajax_restore_image'      , 'ajax_restore_featured_image'      );
+add_action('wp_ajax_regex_image'        , 'ajax_regex_image'     );
 
 // require helper
 require_once dirname(__FILE__). '/libs/helper.php';
@@ -50,7 +50,7 @@ function grab_image_run() {
  * @package download-image
  * ajax function to download image
  */
-function ajax_download_image_post() {
+function ajax_download_image() {
     $id = intval($_REQUEST['id']);
     $post = get_post($id);
     if (empty($post)) {
@@ -58,85 +58,55 @@ function ajax_download_image_post() {
         wp_die();
     }
 
-    // call helper class
-    $helper = new grabimage_helper();
+    $full_url = wp_get_attachment_image_url($id, 'full');
+    $thumbnail_url = wp_get_attachment_image_url($id, 'thumbnail');
 
-    // get all attachments of post
-    $attachments = get_posts(array(
-        'post_type'      => 'attachment',
-        'posts_per_page' => -1,
-        'post_parent'    => $post->ID,
-        'exclude'        => get_post_thumbnail_id($post->ID)
-    ));
+    if (!$full_url) {
+        echo 'Error, file does not exists';
+    } else {
+        $helper = new grabimage_helper();
+        echo "<a href='$full_url' target='_blank'>$full_url</a>";
 
-    // get thumbnail of post
-    $thumbnail = get_post(get_post_thumbnail_id($post->ID));
-    if (!empty($thumbnail)) {
-        $attachments[] = $thumbnail;
-    }
+        // download full attachment
+        echo '<br/>';
+        if ($full_link = $helper->media_download($full_url)) {
+            echo "<a href='$full_link' target='_blank'>Success, full size was download</a>";
+        } else {
+            echo "<a href='$full_link' target='_blank'>Error, full size was not downloaded</a>";
+        }
 
-    $count = 0;
-    if ($attachments) {
-        foreach ($attachments as $attachment) {
-            $attachment_url = wp_get_attachment_image_url($attachment->ID, 'full');
-
-            // ignore s3 image
-            if (strpos($attachment_url, 'wp-uploads.interactives.dk') !== false) {
-                continue;
-            }
-
-            // ignore not local image
-            if (strpos($attachment_url, $_SERVER['SERVER_NAME']) === false) {
-                continue;
-            }
-
-            $original_domain = "http://sarahlouise.dk/wp-content/";
-            $original_url = $helper->original_image_url($attachment_url, $original_domain);
-
-            // init file
-            $file = array();
-            $file['name'] = $helper->clean_basename($helper->basename($original_url));
-
-            // get uploads path
-            $time = current_time('mysql');
-            if (substr($attachment->post_date, 0, 4) > 0) {
-                $time = $attachment->post_date;
-            }
-            $uploads = wp_upload_dir($time);
-
-            // check if image exist on hard disk
-            if (!file_exists($uploads['path']. '/'. $file['name'])) {
-                $file['file'] = $uploads['path']. '/'. $file['name'];
-                $filetype = wp_check_filetype($file['file']);
-                $file['type'] = $filetype['type'];
-                $file['tmp_name'] = download_url($original_url);
-                $file['error'] = 0;
-
-                // download image file
-                $overrides = array('test_form'=>false);
-                $file = wp_handle_sideload( $file, $overrides, $time );
-
-                if ( isset($file['error']) ) {
-                    echo "error, <a href='{$original_url}' target='_blank'>{$original_url}</a> can't be downloaded<br/>";
-                    continue;
-                } else {
-                    $count++;
-                    echo "sucess, <a href='{$original_url}' target='_blank'>{$original_url}</a> is downloaded<br/>";
-                }
-                $file = $file['file'];
-            } else {
-                echo "sucess, <a href='{$original_url}' target='_blank'>{$original_url}</a> existed<br/>";
-                $file = $uploads['path']. '/'. $file['name'];
-            }
-
-            /*
-             * update attachment metadata
-             * s3 offload will upload and remove on hard disk if it 's turned on
-             */
-            wp_update_attachment_metadata( $attachment->ID, wp_generate_attachment_metadata( $attachment->ID, $file ) );
+        // download thumbnail attachment
+        echo '<br/>';
+        if ($thumb_link = $helper->media_download($thumbnail_url)) {
+            echo "<a href='$thumb_link' target='_blank'>Success, thumbnail size was download</a>";
+        } else {
+            echo "<a href='$thumb_link' target='_blank'>Error, thumbnail size was not downloaded</a>";
         }
     }
-    echo 'Downloaded '. $count. ' new image';
+
+    wp_die();
+}
+
+/**
+ * @package download-image
+ * ajax function to download image
+ */
+function ajax_regex_image() {
+    $id = intval($_REQUEST['id']);
+    $post = get_post($id);
+    if (empty($post)) {
+        echo 'Wrong post ID';
+        wp_die();
+    }
+
+    // fix loop issue
+    remove_action('save_post', 'grab_image_save_post');
+
+    preg_match('/uploads\/([0-9]*)\/([0-9]*)\/[0-9]*\/(.*)/', $url, $m);
+
+    // rehook save_post
+    add_action( 'save_post', 'grab_image_save_post' );
+
     wp_die();
 }
 
