@@ -99,10 +99,44 @@ function ajax_regex_image() {
         wp_die();
     }
 
+    if (!function_exists('replace_all')) {
+        function replace_all($subject) {
+            $pattern = '/"http:\/\/wp-uploads.interactives.dk\/(.*?)\/uploads\/([0-9]*)\/([0-9]*)\/[0-9]*\/(.[^"]*)"/s';
+            preg_match_all($pattern, $subject, $matches);
+
+            $search = $replace = array();
+            foreach ($matches[0] as $i => $match) {
+                if (!in_array($match, $search)) {
+                    $search[] = $match;
+                    $link = home_url(). "/wp-content/uploads/{$matches[2][$i]}/{$matches[3][$i]}/{$matches[4][$i]}";
+                    $replace[] = '"'. $link. '"';
+
+                    // print to browser
+                    echo "<a href='{$link}' target='_blank'>{$link}</a>";
+                    echo "<br/>";
+                }
+            }
+
+            if (count($replace)) {
+                echo count($replace). ' urls were replaced';
+                return str_replace($search, $replace, $subject);
+            } else {
+                echo '0 url was replaced';
+                return false;
+            }
+        }
+    }
+
     // fix loop issue
     remove_action('save_post', 'grab_image_save_post');
 
-    preg_match('/uploads\/([0-9]*)\/([0-9]*)\/[0-9]*\/(.*)/', $url, $m);
+    $post_content = replace_all($post->post_content);
+    if (!empty($post_content)) {
+        wp_update_post([
+            'ID' => $post->ID,
+            'post_content' => $post_content,
+        ]);
+    }
 
     // rehook save_post
     add_action( 'save_post', 'grab_image_save_post' );
