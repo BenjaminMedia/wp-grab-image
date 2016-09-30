@@ -1,11 +1,29 @@
 <?php
-$posts = get_posts([
-    'posts_per_page' => -1,
-    'post_status' => 'publish',
-    'orderby' => 'ID',
-    'order'   => 'DESC',
-    'post_type' => 'post'
-]);
+if ($action != 'download') {
+    /**
+     * get all post of site
+     */
+    $array = array(
+        'post_type' => 'post',
+        'posts_per_page' => -1,
+        'post_status' => 'publish',
+        'orderby' => 'ID',
+        'order'   => 'DESC'
+    );
+} else {
+    /**
+     * get all image of site
+     */
+    $array = array(
+        'post_type' => 'attachment',
+        'posts_per_page' => -1,
+        'post_status' => 'inherit',
+        'orderby' => 'ID',
+        'order'   => 'DESC'
+    );
+}
+$media_query = new WP_Query($array);
+$posts = $media_query->get_posts();
 ?>
 <script type="text/javascript">
     jQuery(document).ready(function () {
@@ -114,11 +132,10 @@ $posts = get_posts([
         <th>Title</th>
         <th>Created</th>
         <th>Run</th>
-        <?php if ($action == 'restore_fru') { ?>
-            <th>Featured image</th>
-            <th>Status</th>
-        <?php } ?>
         <th>Result</th>
+    </tr>
+    <tr>
+        <th colspan="6"><?php echo count($posts); ?> items</th>
     </tr>
 
     <?php
