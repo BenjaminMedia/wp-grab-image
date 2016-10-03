@@ -2,7 +2,7 @@
 /**
  * @package grab-image
  * Plugin Name: Grab Image
- * Version: 2.3
+ * Version: 2.4
  * Description: Grab images of img tags are re-uploads them to be located on the site.
  * Author: Niteco
  * Author URI: http://niteco.se/
@@ -68,20 +68,12 @@ function ajax_download_image() {
         echo "<a href='$full_url' target='_blank'>$full_url</a>";
 
         // download full attachment
-        echo '<br/>';
-        if ($full_link = $helper->media_download($full_url)) {
-            echo "<a href='$full_link' target='_blank'>Success, full size was download</a>";
-        } else {
-            echo "<a href='$full_link' target='_blank'>Error, full size was not downloaded</a>";
-        }
+        echo '<br/>Full size, ';
+        $helper->media_download($full_url);
 
         // download thumbnail attachment
-        echo '<br/>';
-        if ($thumb_link = $helper->media_download($thumbnail_url)) {
-            echo "<a href='$thumb_link' target='_blank'>Success, thumbnail size was download</a>";
-        } else {
-            echo "<a href='$thumb_link' target='_blank'>Error, thumbnail size was not downloaded</a>";
-        }
+        echo '<br/>Thumbnail size, ';
+        $helper->media_download($thumbnail_url);
     }
 
     wp_die();
@@ -99,47 +91,41 @@ function ajax_regex_image() {
         wp_die();
     }
 
-    if (!function_exists('replace_all')) {
-        function replace_all($subject) {
-            $pattern = '/"http:\/\/wp-uploads.interactives.dk\/(.*?)\/uploads\/([0-9]*)\/([0-9]*)\/[0-9]*\/(.[^"]*)"/s';
-            preg_match_all($pattern, $subject, $matches);
+    $content = $post->post_content;
+    $pattern = '/"http:\/\/wp-uploads.interactives.dk\/(.*?)\/uploads\/([0-9]*)\/([0-9]*)\/[0-9]*\/(.[^"]*)"/s';
+    preg_match_all($pattern, $content, $matches);
 
-            $search = $replace = array();
-            foreach ($matches[0] as $i => $match) {
-                if (!in_array($match, $search)) {
-                    $search[] = $match;
-                    $link = home_url(). "/wp-content/uploads/{$matches[2][$i]}/{$matches[3][$i]}/{$matches[4][$i]}";
-                    $replace[] = '"'. $link. '"';
+    $search = $replace = array();
+    foreach ($matches[0] as $i => $match) {
+        if (!in_array($match, $search)) {
+            $search[] = $match;
+            $link = home_url(). "/wp-content/uploads/{$matches[2][$i]}/{$matches[3][$i]}/{$matches[4][$i]}";
+            $replace[] = '"'. $link. '"';
 
-                    // print to browser
-                    echo "<a href='{$link}' target='_blank'>{$link}</a>";
-                    echo "<br/>";
-                }
-            }
-
-            if (count($replace)) {
-                echo count($replace). ' urls were replaced';
-                return str_replace($search, $replace, $subject);
-            } else {
-                echo '0 url was replaced';
-                return false;
-            }
+            // print to browser
+            echo "<a href='{$link}' target='_blank'>{$link}</a>";
+            echo "<br/>";
         }
     }
 
-    // fix loop issue
-    remove_action('save_post', 'grab_image_save_post');
+    if (count($replace)) {
+        $content = str_replace($search, $replace, $content);
+        if (!empty($content)) {
+            // fix loop issue
+            remove_action('save_post', 'grab_image_save_post');
 
-    $post_content = replace_all($post->post_content);
-    if (!empty($post_content)) {
-        wp_update_post([
-            'ID' => $post->ID,
-            'post_content' => $post_content,
-        ]);
+            wp_update_post([
+                'ID' => $post->ID,
+                'post_content' => $content,
+            ]);
+
+            // rehook save_post
+            add_action( 'save_post', 'grab_image_save_post' );
+        }
+        echo count($replace). ' urls were replaced';
+    } else {
+        echo '0 url was replaced';
     }
-
-    // rehook save_post
-    add_action( 'save_post', 'grab_image_save_post' );
 
     wp_die();
 }

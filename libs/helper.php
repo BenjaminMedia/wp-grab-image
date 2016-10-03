@@ -642,16 +642,20 @@ class grabimage_helper
 
         // file exists
         if (file_exists($file)) {
-            return $link;
+            echo "<a href='$link' target='_blank'>Success, file exists, doesn't need to download</a>";
+            return true;
         } else {
             $tmp = download_url($url);
             if (!is_wp_error($tmp)) {
                 if (rename($tmp, $file)) {
-                    return $link;
+                    echo "<a href='$link' target='_blank'>Success, file was downloaded</a>";
+                    return true;
                 } else {
+                    echo "<a href='$link' target='_blank'>Error, file wasn't downloaded</a>";
                     return false;
                 }
             } else {
+                echo "<a href='$link' target='_blank'>Error, file wasn't downloaded</a>";
                 return false;
             }
         }
