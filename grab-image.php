@@ -2,7 +2,7 @@
 /**
  * @package grab-image
  * Plugin Name: Grab Image
- * Version: 2.4
+ * Version: 2.4a
  * Description: Grab images of img tags are re-uploads them to be located on the site.
  * Author: Niteco
  * Author URI: http://niteco.se/
@@ -59,7 +59,6 @@ function ajax_download_image() {
     }
 
     $full_url = wp_get_attachment_image_url($id, 'full');
-    $thumbnail_url = wp_get_attachment_image_url($id, 'thumbnail');
 
     if (!$full_url) {
         echo 'Error, file does not exists';
@@ -67,13 +66,18 @@ function ajax_download_image() {
         $helper = new grabimage_helper();
         echo "<a href='$full_url' target='_blank'>$full_url</a>";
 
-        // download full attachment
-        echo '<br/>Full size, ';
-        $helper->media_download($full_url);
-
-        // download thumbnail attachment
-        echo '<br/>Thumbnail size, ';
-        $helper->media_download($thumbnail_url);
+        $sizes = array(
+            'full',
+            'large',
+            'medium',
+            'thumbnail'
+        );
+        // download attachment
+        foreach ($sizes as $size) {
+            echo '<br/>'. ucfirst($size). ' size,';
+            $url = wp_get_attachment_image_url($id, $size);
+            $helper->media_download($url);
+        }
     }
 
     wp_die();
@@ -92,7 +96,7 @@ function ajax_regex_image() {
     }
 
     $content = $post->post_content;
-    $pattern = '/"http:\/\/wp-uploads.interactives.dk\/(.*?)\/uploads\/([0-9]*)\/([0-9]*)\/[0-9]*\/(.[^"]*)"/s';
+    $pattern = '/"http:\/\/wp-uploads.interactives.dk\/(.*?)\/uploads\/([0-9]*)\/([0-9]*)\/[0-9]*\/(.[^"]*)"/';
     preg_match_all($pattern, $content, $matches);
 
     $search = $replace = array();
@@ -427,7 +431,6 @@ function grab_image_save_post( $post_id ) {
     if ( defined('DOING_AUTOSAVE') && DOING_AUTOSAVE ) {
         return;
     }
-        
 
     // perform permission checks! for example:
     if ( !current_user_can('edit_post', $post_id) ) {
