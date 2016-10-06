@@ -1,5 +1,16 @@
 <?php
-if ($action != 'download') {
+if ($action == 'download') {
+    /**
+     * get all image of site
+     */
+    $array = array(
+        'post_type'      => 'attachment',
+        'posts_per_page' => - 1,
+        'post_status'    => 'inherit',
+        'orderby'        => 'ID',
+        'order'          => 'DESC'
+    );
+} else if ($action == 'recover') {
     /**
      * get all post of site
      */
@@ -8,18 +19,18 @@ if ($action != 'download') {
         'posts_per_page' => -1,
         'post_status' => 'publish',
         'orderby' => 'ID',
-        'order'   => 'DESC'
+        'order'   => 'ASC',
     );
 } else {
     /**
-     * get all image of site
+     * get all post of site
      */
     $array = array(
-        'post_type' => 'attachment',
+        'post_type' => 'post',
         'posts_per_page' => -1,
-        'post_status' => 'inherit',
+        'post_status' => 'publish',
         'orderby' => 'ID',
-        'order'   => 'DESC'
+        'order'   => 'DESC',
     );
 }
 $media_query = new WP_Query($array);

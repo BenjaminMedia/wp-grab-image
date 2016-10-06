@@ -2,7 +2,7 @@
 /**
  * @package grab-image
  * Plugin Name: Grab Image
- * Version: 2.5
+ * Version: 2.6
  * Description: Grab images of img tags are re-uploads them to be located on the site.
  * Author: Niteco
  * Author URI: http://niteco.se/
@@ -23,10 +23,39 @@ add_action('wp_ajax_download_image'     , 'ajax_download_image'             );
 add_action('wp_ajax_grab_image'         , 'ajax_grab_image_post'            );
 add_action('wp_ajax_attach_image'       , 'ajax_attach_image_post'          );
 add_action('wp_ajax_search_image'       , 'ajax_search_image_post'          );
-add_action('wp_ajax_regex_image'        , 'ajax_regex_image'     );
+add_action('wp_ajax_regex_image'        , 'ajax_regex_image'                );
+add_action('wp_ajax_recover_image'      , 'ajax_recover_image_post'         );
 
 // require helper
 require_once dirname(__FILE__). '/libs/helper.php';
+
+// trigger save_post
+function grab_image_save_post( $post_id ) {
+    // if this is just a revision, don't do anything
+    if ( wp_is_post_revision( $post_id ) ) {
+        return;
+    }
+
+    // check it's not an auto save routine
+    if ( defined('DOING_AUTOSAVE') && DOING_AUTOSAVE ) {
+        return;
+    }
+
+    // perform permission checks! for example:
+    if ( !current_user_can('edit_post', $post_id) ) {
+        return;
+    }
+
+    // fix loop issue
+    remove_action('save_post', 'grab_image_save_post');
+
+    $_REQUEST['id'] = $post_id;
+    ajax_grab_image_post(true);
+
+    // rehook save_post
+    add_action( 'save_post', 'grab_image_save_post' );
+}
+add_action( 'save_post', 'grab_image_save_post' );
 
 /**
  * define new menu page parameters
@@ -365,9 +394,9 @@ function ajax_search_image_post() {
 
 /**
  * @package grab-image
- * ajax function to restore old featured images
+ * ajax function to recover image for boligcious' images
  */
-function ajax_restore_featured_image() {
+function ajax_recover_image_post() {
     $post_id = intval($_REQUEST['id']);
     $post = get_post($post_id);
     if (empty($post)) {
@@ -378,73 +407,56 @@ function ajax_restore_featured_image() {
     // call helper class
     $helper = new grabimage_helper();
 
-    // original featured image url
-    $original_url = urldecode($_REQUEST['url']);
+    // extract image tag from post_content
+    $tags = $helper->extract_image($post->post_content, false);
 
-    // current featured image url
-    $current_url = get_the_post_thumbnail_url($post_id, 'full');
+    $search = $replace = array();
+    foreach ($tags as $tag => $url) {
+        $time = strtotime($post->post_date);
+        if (strpos($tag, '<a') !== false) {
+            $pattern1 = '.*href="(.[^"]*).*wp-image-([0-9]*).*src="(.[^"]*).*';
+            preg_match("/$pattern1/", $tag, $matches);
+            $post_id = $matches[2];
+            if (get_post_status($post_id) === false) {
+                // a href url
+                $url = $matches[1];
+                $tmp = explode('/', $url);
+                $search[] = $url;
+                $replace[] = "https://boligcious.files.wordpress.com/". date('Y', $time). "/". date('m', $time). "/". $tmp[count($tmp) - 1];
 
-    // get attachment_id from original featured image url
-    $attachment_id = $helper->get_attachment_id($original_url);
-
-    // if empty the download
-    if (empty($attachment_id)) {
-        $attachment_id = $helper->media_download_sideload($original_url, $post_id);
-    }
-
-    // if correct then set as post featured image
-    if (!is_wp_error($attachment_id)) {
-        set_post_thumbnail($post, $attachment_id);
-    }
-
-    // check post thumbnail exist or not
-    $helper->set_post_thumbnail($post->ID);
-
-    // new featured image url
-    $new_url = get_the_post_thumbnail_url($post_id, 'full');
-
-    if (empty($new_url)) {
-        echo '<span class="label label-danger">Error</span> no featured image was added';
-    } else {
-        if ($helper->compare_basename($current_url, $new_url)) {
-            echo 'Nothing to do';
+                // img src url
+                $url = $matches[3];
+                $tmp = explode('/', $url);
+                $search[] = $url;
+                $replace[] = "https://boligcious.files.wordpress.com/". date('Y', $time). "/". date('m', $time). "/". $tmp[count($tmp) - 1];
+            }
         } else {
-            if (empty($current_url)) {
-                echo '<span class="label label-success">Success</span> featured image was added';
-            } else {
-                echo '<span class="label label-success">Success</span> featured image was restored';
+            $pattern2 = '.*wp-image-([0-9]*).*src="(.[^"]*).*';
+            preg_match("/$pattern2/", $tag, $matches);
+            $post_id = $matches[1];
+            if (get_post_status($post_id) === false) {
+                // img src url
+                $src_url = $matches[2];
+                $tmp = explode('/', $src_url);
+                $search[] = $src_url;
+                $replace[] = "https://boligcious.files.wordpress.com/". date('Y', $time). "/". date('m', $time). "/". $tmp[count($tmp) - 1];
             }
         }
     }
 
-    wp_die();
+    $content = str_replace($search, $replace, $post->post_content);
+
+    if (count($replace)) {
+        $content = str_replace($search, $replace, $content);
+        if (!empty($content)) {
+            wp_update_post([
+                'ID' => $post->ID,
+                'post_content' => $content,
+            ]);
+        }
+        echo count($replace). ' urls were replaced to files.wordpress.com';
+    } else {
+        echo '0 url was replaced';
+    }
+    exit();
 }
-
-// trigger save_post
-function grab_image_save_post( $post_id ) {
-    // if this is just a revision, don't do anything
-    if ( wp_is_post_revision( $post_id ) ) {
-        return;
-    }
-
-    // check it's not an auto save routine
-    if ( defined('DOING_AUTOSAVE') && DOING_AUTOSAVE ) {
-        return;
-    }
-
-    // perform permission checks! for example:
-    if ( !current_user_can('edit_post', $post_id) ) {
-        return;
-    }
-
-    // fix loop issue
-    remove_action('save_post', 'grab_image_save_post');
-
-    $_REQUEST['id'] = $post_id;
-    ajax_grab_image_post(true);
-
-    // rehook save_post
-    add_action( 'save_post', 'grab_image_save_post' );
-}
-
-add_action( 'save_post', 'grab_image_save_post' );
