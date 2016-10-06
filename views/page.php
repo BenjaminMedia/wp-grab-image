@@ -24,6 +24,10 @@
             case 'regex':
                 echo '<h2>Regex images</h2> <p>Images are being replaced from s3 to local !</p>';
                 break;
+
+            case 'recover':
+                echo '<h2>Recover images</h2> <p>Images are being recovered (only for boligcious.dk) !</p>';
+                break;
         }
         echo '</div>';
     }
@@ -44,6 +48,9 @@
         </li>
         <li class="nav-item">
             <a href="?page=grab-image&amp;action=regex" class="nav-link <?php echo ($action == 'regex' ? 'active' : ''); ?>">Regex images</a>
+        </li>
+        <li class="nav-item">
+            <a href="?page=grab-image&amp;action=recover" class="nav-link <?php echo ($action == 'recover' ? 'active' : ''); ?>">Recover images</a>
         </li>
         <li class="nav-item">
             <button id="box-status" class="btn btn-warning" style="display: none;"><span class="fa fa-refresh fa-refresh-animate"></span> <span class="percent">Loading...</span></button>
@@ -89,6 +96,7 @@ if (isset($_GET['action']) && !empty($_GET['action'])) {
         case 'attach':
         case 'search':
         case 'regex':
+        case 'recover':
             include_once dirname(__FILE__). '/partial/default.php';
             break;
     }
