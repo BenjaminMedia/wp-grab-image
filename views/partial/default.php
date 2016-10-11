@@ -1,40 +1,64 @@
 <?php
+global $wpdb;
 if ($action == 'download') {
     /**
      * get all image of site
      */
-    $array = array(
+    /*$array = array(
         'post_type'      => 'attachment',
         'posts_per_page' => - 1,
         'post_status'    => 'inherit',
         'orderby'        => 'ID',
         'order'          => 'DESC'
-    );
+    );*/
+
+    $query = "SELECT t.* 
+    FROM {$wpdb->posts} AS t 
+    WHERE 1=1 
+    AND t.post_type = 'attachment' 
+    AND t.post_status = 'inherit'
+    ORDER BY t.ID DESC";
 } else if ($action == 'recover') {
     /**
      * get all post of site
      */
-    $array = array(
+    /*$array = array(
         'post_type' => 'post',
         'posts_per_page' => -1,
         'post_status' => 'publish',
         'orderby' => 'ID',
         'order'   => 'ASC',
-    );
+    );*/
+
+    $query = "SELECT t.* 
+    FROM {$wpdb->posts} AS t 
+    WHERE 1=1 
+    AND t.post_type = 'post' 
+    AND t.post_status = 'publish'
+    ORDER BY t.ID ASC";
 } else {
     /**
      * get all post of site
      */
-    $array = array(
+    /*$array = array(
         'post_type' => 'post',
         'posts_per_page' => -1,
         'post_status' => 'publish',
         'orderby' => 'ID',
         'order'   => 'DESC',
-    );
+    );*/
+
+    $query = "SELECT t.* 
+    FROM {$wpdb->posts} AS t 
+    WHERE 1=1 
+    AND t.post_type = 'post' 
+    AND t.post_status = 'publish'
+    ORDER BY t.ID DESC";
 }
-$media_query = new WP_Query($array);
-$posts = $media_query->get_posts();
+/*$media_query = new WP_Query($array);
+$posts = $media_query->get_posts();*/
+
+$posts = $wpdb->get_results($query);
 ?>
 <script type="text/javascript">
     jQuery(document).ready(function () {
