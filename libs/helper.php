@@ -126,6 +126,21 @@ class grabimage_helper
     }
 
     /**
+     * get image file name exclude size
+     * @param $file
+     *
+     * @return string
+     */
+    public function exclude_size($file) {
+        // remove size string
+        if (preg_match('/^(.*)\-[0-9]+x[0-9]+\.(jpg|jpeg|png)$/', $file, $m)) {
+            $file = $m[1].'.'.$m[2];
+        }
+
+        return $file;
+    }
+
+    /**
      * compare basename of original and current images
      * @param $first
      * @param $second
@@ -222,6 +237,10 @@ class grabimage_helper
         $path = $this->basepath($url);
         $path2 = rawurldecode($path);
 
+        // exclude image size
+        $path_b = $this->exclude_size($path);
+        $path2_b = $this->exclude_size($path2);
+
         $temp = explode('/', $path);
         if (count($temp) == 3) {
             $query_args = array(
@@ -237,6 +256,16 @@ class grabimage_helper
                     ),
                     array(
                         'value'   => $path2,
+                        'compare' => 'LIKE',
+                        'key'     => '_wp_attachment_metadata',
+                    ),
+                    array(
+                        'value'   => $path_b,
+                        'compare' => 'LIKE',
+                        'key'     => '_wp_attachment_metadata',
+                    ),
+                    array(
+                        'value'   => $path2_b,
                         'compare' => 'LIKE',
                         'key'     => '_wp_attachment_metadata',
                     ),
@@ -258,6 +287,16 @@ class grabimage_helper
                         'value'   => $path2,
                         'compare' => 'LIKE',
                         'key'     => 'amazonS3_info',
+                    ),
+                    array(
+                        'value'   => $path_b,
+                        'compare' => 'LIKE',
+                        'key'     => '_wp_attachment_metadata',
+                    ),
+                    array(
+                        'value'   => $path2_b,
+                        'compare' => 'LIKE',
+                        'key'     => '_wp_attachment_metadata',
                     ),
                 )
             );
