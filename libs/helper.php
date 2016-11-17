@@ -1,7 +1,7 @@
 <?php
-require_once dirname(__FILE__). '/simple_html_dom.php';
+if (!class_exists('simple_html_dom_node') require_once dirname(__FILE__). '/simple_html_dom.php';
 require_once dirname(__FILE__). '/snoopy.class.php';
-require_once dirname(__FILE__). '/XML2Array.php';
+if (!class_exists('XML2Array') require_once dirname(__FILE__). '/XML2Array.php';
 
 class grabimage_helper
 {
