@@ -2,16 +2,8 @@
 global $wpdb;
 if ($action == 'download') {
     /**
-     * get all image of site
+     * get all attachment image of site
      */
-    /*$array = array(
-        'post_type'      => 'attachment',
-        'posts_per_page' => - 1,
-        'post_status'    => 'inherit',
-        'orderby'        => 'ID',
-        'order'          => 'DESC'
-    );*/
-
     $query = "SELECT t.* 
     FROM {$wpdb->posts} AS t 
     WHERE 1=1 
@@ -20,34 +12,19 @@ if ($action == 'download') {
     ORDER BY t.ID DESC";
 } else if ($action == 'recover') {
     /**
-     * get all post of site
+     * get all post of site, oldest first
      */
-    /*$array = array(
-        'post_type' => 'post',
-        'posts_per_page' => -1,
-        'post_status' => 'publish',
-        'orderby' => 'ID',
-        'order'   => 'ASC',
-    );*/
-
     $query = "SELECT t.* 
     FROM {$wpdb->posts} AS t 
     WHERE 1=1 
     AND t.post_type = 'post' 
     AND t.post_status = 'publish'
+    AND t.post_content LIKE '%class=\"alignnone size-full wp-image-\"%'
     ORDER BY t.ID ASC";
 } else {
     /**
-     * get all post of site
+     * get all post of site, latest first
      */
-    /*$array = array(
-        'post_type' => 'post',
-        'posts_per_page' => -1,
-        'post_status' => 'publish',
-        'orderby' => 'ID',
-        'order'   => 'DESC',
-    );*/
-
     $query = "SELECT t.* 
     FROM {$wpdb->posts} AS t 
     WHERE 1=1 
@@ -55,9 +32,6 @@ if ($action == 'download') {
     AND t.post_status = 'publish'
     ORDER BY t.ID DESC";
 }
-/*$media_query = new WP_Query($array);
-$posts = $media_query->get_posts();*/
-
 $posts = $wpdb->get_results($query);
 ?>
 <script type="text/javascript">
