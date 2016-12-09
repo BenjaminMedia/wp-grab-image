@@ -238,8 +238,8 @@ class grabimage_helper
         $path2 = rawurldecode($path);
 
         // exclude image size
-        $path_b = $this->exclude_size($path);
-        $path2_b = $this->exclude_size($path2);
+        $path_x = $this->exclude_size($path);
+        $path2_x = $this->exclude_size($path2);
 
         $temp = explode('/', $path);
         if (count($temp) == 3) {
@@ -260,12 +260,12 @@ class grabimage_helper
                         'key'     => '_wp_attachment_metadata',
                     ),
                     array(
-                        'value'   => $path_b,
+                        'value'   => $path_x,
                         'compare' => 'LIKE',
                         'key'     => '_wp_attachment_metadata',
                     ),
                     array(
-                        'value'   => $path2_b,
+                        'value'   => $path2_x,
                         'compare' => 'LIKE',
                         'key'     => '_wp_attachment_metadata',
                     ),
@@ -289,12 +289,120 @@ class grabimage_helper
                         'key'     => 'amazonS3_info',
                     ),
                     array(
-                        'value'   => $path_b,
+                        'value'   => $path_x,
                         'compare' => 'LIKE',
                         'key'     => '_wp_attachment_metadata',
                     ),
                     array(
-                        'value'   => $path2_b,
+                        'value'   => $path2_x,
+                        'compare' => 'LIKE',
+                        'key'     => '_wp_attachment_metadata',
+                    ),
+                )
+            );
+        }
+
+        $query = new WP_Query( $query_args );
+        $file = basename($path);
+        $file2 = basename($path2);
+
+        if ( $query->have_posts() ) {
+            foreach ( $query->posts as $post_id ) {
+                $meta = wp_get_attachment_metadata( $post_id );
+                $original_file       = basename( $meta['file'] );
+                $cropped_image_files = wp_list_pluck( $meta['sizes'], 'file' );
+                if (
+                    $file == $original_file
+                    ||  in_array($file , $cropped_image_files)
+                    ||  $file2 == $original_file
+                    ||  in_array($file2 , $cropped_image_files)
+                ) {
+                    $attachment_id = $post_id;
+                    break;
+                }
+            }
+        }
+
+        // search basename
+        if (empty($attachment_id)) {
+            $attachment_id = $this->get_attachment_id_by_basename($url);
+        }
+
+        return $attachment_id;
+    }
+
+    public function get_attachment_id_by_basename($url, $check_base = false) {
+        $attachment_id = 0;
+
+        if ($check_base) {
+            $dir = wp_upload_dir();
+            if (false !== strpos($this->basename($url), $dir['baseurl'] . '/')) { // Is URL in uploads directory?
+                return $attachment_id;
+            }
+        }
+
+        // check by basepath first
+        $path = $this->basename($url);
+        $path2 = rawurldecode($path);
+
+        // exclude image size
+        $path_x = $this->exclude_size($path);
+        $path2_x = $this->exclude_size($path2);
+
+        $temp = explode('/', $path);
+        if (count($temp) == 3) {
+            $query_args = array(
+                'post_type'   => 'attachment',
+                'post_status' => 'inherit',
+                'fields'      => 'ids',
+                'meta_query'  => array(
+                    'relation' => 'OR',
+                    array(
+                        'value'   => $path,
+                        'compare' => 'LIKE',
+                        'key'     => '_wp_attachment_metadata',
+                    ),
+                    array(
+                        'value'   => $path2,
+                        'compare' => 'LIKE',
+                        'key'     => '_wp_attachment_metadata',
+                    ),
+                    array(
+                        'value'   => $path_x,
+                        'compare' => 'LIKE',
+                        'key'     => '_wp_attachment_metadata',
+                    ),
+                    array(
+                        'value'   => $path2_x,
+                        'compare' => 'LIKE',
+                        'key'     => '_wp_attachment_metadata',
+                    ),
+                )
+            );
+        } else { global $wpdb;
+            $query_args = array(
+                'post_type'   => 'attachment',
+                'post_status' => 'inherit',
+                'fields'      => 'ids',
+                'meta_query'  => array(
+                    'relation' => 'OR',
+                    array(
+                        'value'   => $wpdb->_escape($path),
+                        'compare' => 'LIKE',
+                        'key'     => 'amazonS3_info',
+                    ),
+                    array(
+                        'value'   => $path2,
+                        'compare' => 'LIKE',
+                        'key'     => 'amazonS3_info',
+                    ),
+                    array(
+                        'value'   => $path_x,
+                        'compare' => 'LIKE',
+                        'key'     => '_wp_attachment_metadata',
+                    ),
+                    array(
+                        'value'   => $path2_x,
                         'compare' => 'LIKE',
                         'key'     => '_wp_attachment_metadata',
                     ),
@@ -324,98 +432,6 @@ class grabimage_helper
         }
 
         return $attachment_id;
-    }
-
-    /**
-     * generate json file for mapping data
-     * @param $site
-     *
-     * @return array|mixed|object
-     */
-    public function get_old_thumbnail($site) {
-        /***** frutimain.no blog
-        $file = dirname(__FILE__). "/frutimian.wordpress.xml";
-        if (file_exists($file)) {
-            require_once dirname( __FILE__ ) . '/XML2Array.php';
-
-            $xml       = file_get_contents( $file );
-            $a         = XML2Array::createArray( $xml );
-            $items     = $a["rss"]["channel"]["item"];
-            $map       = [ ];
-            $thumbnail = [ ];
-
-            for ( $i = 0; $i < count( $items ); $i ++ ) {
-                $item       = $items[ $i ];
-                $id         = $item["wp:post_id"];
-                $map["$id"] = $i;
-            }
-
-            for ( $i = 0; $i < count( $items ); $i ++ ) {
-                $item       = $items[ $i ];
-                $id         = $item["wp:post_id"];
-                $post_title = $item["title"];
-                $post_type  = $item["wp:post_type"]["@cdata"];
-
-                if ( $post_type != "post" ) {
-                    continue;
-                }
-
-                $postmeta = $item["wp:postmeta"];
-                foreach ( $postmeta as $meta ) {
-                    if ( $meta["wp:meta_key"]["@cdata"] == "_thumbnail_id" ) {
-                        $thumb_id = $meta["wp:meta_value"]["@cdata"];
-                        $thumb    = $items[ $map["$thumb_id"] ];
-
-                        $thumb_url      = $thumb["guid"]["@value"];
-                        $attachment_url = $thumb["wp:attachment_url"]["@cdata"];
-
-                        $thumbnail["$id"] = array(
-                            "post_title"     => $post_title,
-                            "thumb_id"       => $thumb_id,
-                            "thumb_url"      => $thumb_url,
-                            "attachment_url" => $attachment_url,
-                        );
-                    }
-                }
-            }
-
-            file_put_contents(dirname(__FILE__). '/thumbnail_fru.json', json_encode($thumbnail));
-        }
-        *****/
-
-        /*****
-        $domain = 'http://sarahlouise.dk';
-        $home_url = get_home_url();
-
-        $total = 6105;
-        $limit = 300;
-        $page = floor($total / $limit) + 1;
-        for ($i = 1; $i <= $page; $i++) {
-            $html = file_get_html($domain. '/page/'. $i);
-            foreach ($html->find('.entry-thumbnail') as $j => $entry) {
-                if ($j > $limit) {
-                    break;
-                }
-                $href = $entry->find('a', 0)->href;
-                $src = $entry->find('img', 0)->src;
-                $array[$href] = $src;
-            }
-        }
-        $json = json_encode($array);
-        file_put_contents(dirname(__FILE__). '/json/sarahlouise.json', $json);
-        *****/
-
-        if ($site == 'frut') {
-            $file = dirname(__FILE__) . '/../json/frutimian.json';
-        } else {
-            $file = dirname(__FILE__) . '/../json/thumbnail.json';
-        }
-        if (file_exists($file)) {
-            $json = file_get_contents($file);
-            return json_decode($json, true);
-        } else {
-            return array();
-        }
     }
 
     /**

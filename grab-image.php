@@ -2,7 +2,7 @@
 /**
  * @package grab-image
  * Plugin Name: Grab Image
- * Version: 3.0
+ * Version: 3.1
  * Description: Grab images of img tags are re-uploads them to be located on the site.
  * Author: Niteco
  * Author URI: http://niteco.se/
@@ -18,31 +18,37 @@ ini_set('max_execution_time', 3000);
 error_reporting(E_ERROR);
 
 // start up the engine
-add_action('admin_menu'                 , 'grab_image_page'                 );
-add_action('wp_ajax_download_image'     , 'ajax_download_image'             );
-add_action('wp_ajax_grab_image'         , 'ajax_grab_image_post'            );
-add_action('wp_ajax_attach_image'       , 'ajax_attach_image_post'          );
-add_action('wp_ajax_search_image'       , 'ajax_search_image_post'          );
-add_action('wp_ajax_regex_image'        , 'ajax_regex_image'                );
-add_action('wp_ajax_recover_image'      , 'ajax_recover_image_post'         );
+add_action('admin_menu', 'grab_image_page');
+add_action('wp_ajax_download_image', 'ajax_download_image');
+add_action('wp_ajax_grab_image', 'ajax_grab_image_post');
+add_action('wp_ajax_attach_image', 'ajax_attach_image_post');
+add_action('wp_ajax_search_image', 'ajax_search_image_post');
+add_action('wp_ajax_regex_image', 'ajax_regex_image');
+add_action('wp_ajax_recover_image', 'ajax_recover_image_post');
 
 // require helper
-require_once dirname(__FILE__). '/libs/helper.php';
+require_once dirname(__FILE__) . '/libs/helper.php';
 
 // trigger save_post
-function grab_image_save_post( $post_id ) {
+function grab_image_save_post($post_id)
+{
     // if this is just a revision, don't do anything
-    if ( wp_is_post_revision( $post_id ) ) {
+    if (wp_is_post_revision($post_id)) {
+        return;
+    }
+
+    // if not post, don't do anything
+    if (get_post_type($post_id) != 'post') {
         return;
     }
 
     // check it's not an auto save routine
-    if ( defined('DOING_AUTOSAVE') && DOING_AUTOSAVE ) {
+    if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
         return;
     }
 
     // perform permission checks! for example:
-    if ( !current_user_can('edit_post', $post_id) ) {
+    if (!current_user_can('edit_post', $post_id)) {
         return;
     }
 
@@ -53,25 +59,28 @@ function grab_image_save_post( $post_id ) {
     ajax_grab_image_post(true);
 
     // rehook save_post
-    add_action( 'save_post', 'grab_image_save_post' );
+    add_action('save_post', 'grab_image_save_post');
 }
-add_action( 'save_post', 'grab_image_save_post' );
+
+add_action('save_post', 'grab_image_save_post');
 
 /**
  * define new menu page parameters
  */
-function grab_image_page() {
-    add_menu_page( 'Grab Image', 'Grab Image', 'activate_plugins', 'grab-image', 'grab_image_run', '');
+function grab_image_page()
+{
+    add_menu_page('Grab Image', 'Grab Image', 'activate_plugins', 'grab-image', 'grab_image_run', '');
 }
 
 /**
  * plugin page
  */
-function grab_image_run() {
-    if (!current_user_can('manage_options'))  {
-        wp_die( __('You do not have sufficient permissions to access this page.') );
+function grab_image_run()
+{
+    if (!current_user_can('manage_options')) {
+        wp_die(__('You do not have sufficient permissions to access this page.'));
     } else {
-        require_once dirname(__FILE__). '/views/page.php';
+        require_once dirname(__FILE__) . '/views/page.php';
     }
 }
 
@@ -79,7 +88,8 @@ function grab_image_run() {
  * @package download-image
  * ajax function to download image
  */
-function ajax_download_image() {
+function ajax_download_image()
+{
     $id = intval($_REQUEST['id']);
     $post = get_post($id);
     if (empty($post)) {
@@ -103,7 +113,7 @@ function ajax_download_image() {
         );
         // download attachment
         foreach ($sizes as $size) {
-            echo '<br/>'. ucfirst($size). ' size,';
+            echo '<br/>' . ucfirst($size) . ' size,';
             $url = wp_get_attachment_image_url($id, $size);
             $helper->media_download($url);
         }
@@ -116,7 +126,8 @@ function ajax_download_image() {
  * @package download-image
  * ajax function to download image
  */
-function ajax_regex_image() {
+function ajax_regex_image()
+{
     $id = intval($_REQUEST['id']);
     $post = get_post($id);
     if (empty($post)) {
@@ -132,8 +143,8 @@ function ajax_regex_image() {
     foreach ($matches[0] as $i => $match) {
         if (!in_array($match, $search)) {
             $search[] = $match;
-            $link = home_url(). "/wp-content/uploads/{$matches[2][$i]}/{$matches[3][$i]}/{$matches[4][$i]}";
-            $replace[] = '"'. $link. '"';
+            $link = home_url() . "/wp-content/uploads/{$matches[2][$i]}/{$matches[3][$i]}/{$matches[4][$i]}";
+            $replace[] = '"' . $link . '"';
 
             // print to browser
             echo "<a href='{$link}' target='_blank'>{$link}</a>";
@@ -153,9 +164,9 @@ function ajax_regex_image() {
             ]);
 
             // rehook save_post
-            add_action( 'save_post', 'grab_image_save_post' );
+            add_action('save_post', 'grab_image_save_post');
         }
-        echo count($replace). ' urls were replaced';
+        echo count($replace) . ' urls were replaced';
     } else {
         echo '0 url was replaced';
     }
@@ -167,7 +178,8 @@ function ajax_regex_image() {
  * @package grab-image
  * ajax function to grab image
  */
-function ajax_grab_image_post($trigger = false) {
+function ajax_grab_image_post($trigger = false)
+{
     $id = intval($_REQUEST['id']);
     $post = get_post($id);
     if (empty($post)) {
@@ -207,7 +219,7 @@ function ajax_grab_image_post($trigger = false) {
                 $uploads = wp_upload_dir($time);
 
                 // check if image exist on hard disk
-                if (!file_exists($uploads['path']. '/'. $file['name'])) {
+                if (!file_exists($uploads['path'] . '/' . $file['name'])) {
                     $exist = false;
 
                     // sideload image
@@ -243,14 +255,14 @@ function ajax_grab_image_post($trigger = false) {
 
             // return message
             $exist = ($exist ? 'did exist' : 'didn\'t exist');
-            echo "<a href=\"".get_edit_post_link($attachment_id)."\">{$url}</a> <b>{$exist}</b> already.<br/>";
+            echo "<a href=\"" . get_edit_post_link($attachment_id) . "\">{$url}</a> <b>{$exist}</b> already.<br/>";
         }
 
         // update post data search | replace
         if (count($search) > 0 && count($replace) > 0) {
             $post_content = str_replace($search, $replace, $post->post_content);
             $my_post = [
-                'ID'           => $post->ID,
+                'ID' => $post->ID,
                 'post_content' => $post_content,
             ];
             wp_update_post($my_post);
@@ -263,7 +275,7 @@ function ajax_grab_image_post($trigger = false) {
     $helper->set_post_thumbnail($post->ID);
 
     if (!$trigger) {
-        echo 'Found '. $count. ' new image';
+        echo 'Found ' . $count . ' new image';
         wp_die();
     }
 }
@@ -272,7 +284,8 @@ function ajax_grab_image_post($trigger = false) {
  * @package grab-image
  * ajax function to attach image
  */
-function ajax_attach_image_post() {
+function ajax_attach_image_post()
+{
     $id = intval($_REQUEST['id']);
     $post = get_post($id);
     if (empty($post)) {
@@ -327,7 +340,7 @@ function ajax_attach_image_post() {
         if (count($search) > 0 && count($replace) > 0) {
             $post_content = str_replace($search, $replace, $post->post_content);
             $my_post = [
-                'ID'           => $post->ID,
+                'ID' => $post->ID,
                 'post_content' => $post_content,
             ];
             wp_update_post($my_post);
@@ -336,7 +349,7 @@ function ajax_attach_image_post() {
         $count = count($search);
     }
 
-    echo 'Attached '. $count. ' image';
+    echo 'Attached ' . $count . ' image';
     wp_die();
 }
 
@@ -344,7 +357,8 @@ function ajax_attach_image_post() {
  * @package grab-image
  * ajax function to search / replace image
  */
-function ajax_search_image_post() {
+function ajax_search_image_post()
+{
     $id = intval($_REQUEST['id']);
     $post = get_post($id);
     if (empty($post)) {
@@ -352,8 +366,8 @@ function ajax_search_image_post() {
         wp_die();
     }
 
-    $search_str = (string) $_REQUEST['search'];
-    $replace_str = (string) $_REQUEST['replace'];
+    $search_str = (string)$_REQUEST['search'];
+    $replace_str = (string)$_REQUEST['replace'];
 
     // call helper class
     $helper = new grabimage_helper();
@@ -379,7 +393,7 @@ function ajax_search_image_post() {
         if (count($search) > 0 && count($replace) > 0) {
             $post_content = str_replace($search, $replace, $post->post_content);
             $my_post = [
-                'ID'           => $post->ID,
+                'ID' => $post->ID,
                 'post_content' => $post_content,
             ];
             wp_update_post($my_post);
@@ -388,7 +402,7 @@ function ajax_search_image_post() {
         $count = count($search);
     }
 
-    echo 'Searched / Replaced '. $count. ' image';
+    echo 'Searched / Replaced ' . $count . ' image';
     wp_die();
 }
 
@@ -396,7 +410,8 @@ function ajax_search_image_post() {
  * @package grab-image
  * ajax function to recover image for boligcious' images
  */
-function ajax_recover_image_post() {
+function ajax_recover_image_post()
+{
     $post_id = intval($_REQUEST['id']);
     $post = get_post($post_id);
     if (empty($post)) {
@@ -404,59 +419,38 @@ function ajax_recover_image_post() {
         wp_die();
     }
 
-    // call helper class
-    $helper = new grabimage_helper();
-
-    // extract image tag from post_content
-    $tags = $helper->extract_image($post->post_content, false);
-
-    $search = $replace = array();
-    foreach ($tags as $tag => $url) {
-        $time = strtotime($post->post_date);
-        if (strpos($tag, '<a') !== false) {
-            $pattern1 = '.*href="(.[^"]*).*wp-image-([0-9]*).*src="(.[^"]*).*';
-            preg_match("/$pattern1/", $tag, $matches);
-            $post_id = $matches[2];
-            if (get_post_status($post_id) === false) {
-                // a href url
-                $url = $matches[1];
-                $tmp = explode('/', $url);
-                $search[] = $url;
-                $replace[] = "https://boligcious.files.wordpress.com/". date('Y', $time). "/". date('m', $time). "/". $tmp[count($tmp) - 1];
-
-                // img src url
-                $url = $matches[3];
-                $tmp = explode('/', $url);
-                $search[] = $url;
-                $replace[] = "https://boligcious.files.wordpress.com/". date('Y', $time). "/". date('m', $time). "/". $tmp[count($tmp) - 1];
-            }
-        } else {
-            $pattern2 = '.*wp-image-([0-9]*).*src="(.[^"]*).*';
-            preg_match("/$pattern2/", $tag, $matches);
-            $post_id = $matches[1];
-            if (get_post_status($post_id) === false) {
-                // img src url
-                $src_url = $matches[2];
-                $tmp = explode('/', $src_url);
-                $search[] = $src_url;
-                $replace[] = "https://boligcious.files.wordpress.com/". date('Y', $time). "/". date('m', $time). "/". $tmp[count($tmp) - 1];
-            }
-        }
+    if (strpos($post->post_content, 'class="alignnone size-full wp-image-"') === false) {
+        echo 'Post isn\'t needed to recover';
+        return;
     }
 
-    $content = str_replace($search, $replace, $post->post_content);
-
-    if (count($replace)) {
-        $content = str_replace($search, $replace, $content);
-        if (!empty($content)) {
+    // get post revision
+    $found = false;
+    $revisions = wp_get_post_revisions($post);
+    foreach ($revisions as $revision) {
+        if ($revision->ID != $post->ID
+            && strpos($revision->post_content, 'class="alignnone size-full wp-image-"') === false
+            && strpos($revision->post_content, 'wp-uploads.interactives.dk') === false) {
+            // remove dirty backlinks
+            if (strpos($revision->post_content, 'position: absolute') !== false) {
+                $post_content = preg_replace('/<div style=\'position: absolute;.*?>.*?<\/div>/', '', $revision->post_content);
+            } else {
+                $post_content = $revision->post_content;
+            }
             wp_update_post([
                 'ID' => $post->ID,
-                'post_content' => $content,
+                'post_content' => $post_content,
             ]);
+            $found = true;
+            break;
         }
-        echo count($replace). ' urls were replaced to files.wordpress.com';
-    } else {
-        echo '0 url was replaced';
     }
+
+    if ($found) {
+        echo 'Post was recovered';
+    } else {
+        echo 'Post wasn\'t recovered';
+    }
+
     exit();
 }
