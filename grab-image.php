@@ -2,7 +2,7 @@
 /**
  * @package grab-image
  * Plugin Name: Grab Image
- * Version: 3.1
+ * Version: 3.2
  * Description: Grab images of img tags are re-uploads them to be located on the site.
  * Author: Niteco
  * Author URI: http://niteco.se/
@@ -429,6 +429,8 @@ function ajax_recover_image_post()
     $revisions = wp_get_post_revisions($post);
     foreach ($revisions as $revision) {
         if ($revision->ID != $post->ID
+            && !empty($revision->post_content)
+            && strpos($revision->post_content, '<img') !== false
             && strpos($revision->post_content, 'class="alignnone size-full wp-image-"') === false
             && strpos($revision->post_content, 'wp-uploads.interactives.dk') === false) {
             // remove dirty backlinks
