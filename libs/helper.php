@@ -241,66 +241,56 @@ class grabimage_helper
         $path_x = $this->exclude_size($path);
         $path2_x = $this->exclude_size($path2);
 
-        $temp = explode('/', $path);
-        if (count($temp) == 3) {
-            $query_args = array(
-                'post_type'   => 'attachment',
-                'post_status' => 'inherit',
-                'fields'      => 'ids',
-                'meta_query'  => array(
-                    'relation' => 'OR',
-                    array(
-                        'value'   => $path,
-                        'compare' => 'LIKE',
-                        'key'     => '_wp_attachment_metadata',
-                    ),
-                    array(
-                        'value'   => $path2,
-                        'compare' => 'LIKE',
-                        'key'     => '_wp_attachment_metadata',
-                    ),
-                    array(
-                        'value'   => $path_x,
-                        'compare' => 'LIKE',
-                        'key'     => '_wp_attachment_metadata',
-                    ),
-                    array(
-                        'value'   => $path2_x,
-                        'compare' => 'LIKE',
-                        'key'     => '_wp_attachment_metadata',
-                    ),
-                )
-            );
-        } else {
-            $query_args = array(
-                'post_type'   => 'attachment',
-                'post_status' => 'inherit',
-                'fields'      => 'ids',
-                'meta_query'  => array(
-                    'relation' => 'OR',
-                    array(
-                        'value'   => $path,
-                        'compare' => 'LIKE',
-                        'key'     => 'amazonS3_info',
-                    ),
-                    array(
-                        'value'   => $path2,
-                        'compare' => 'LIKE',
-                        'key'     => 'amazonS3_info',
-                    ),
-                    array(
-                        'value'   => $path_x,
-                        'compare' => 'LIKE',
-                        'key'     => '_wp_attachment_metadata',
-                    ),
-                    array(
-                        'value'   => $path2_x,
-                        'compare' => 'LIKE',
-                        'key'     => '_wp_attachment_metadata',
-                    ),
-                )
-            );
-        }
+        $query_args = array(
+            'post_type'   => 'attachment',
+            'post_status' => 'inherit',
+            'fields'      => 'ids',
+            'meta_query'  => array(
+                'relation' => 'OR',
+                array(
+                    'value'   => $path,
+                    'compare' => 'LIKE',
+                    'key'     => '_wp_attachment_metadata',
+                ),
+                array(
+                    'value'   => $path2,
+                    'compare' => 'LIKE',
+                    'key'     => '_wp_attachment_metadata',
+                ),
+                array(
+                    'value'   => $path_x,
+                    'compare' => 'LIKE',
+                    'key'     => '_wp_attachment_metadata',
+                ),
+                array(
+                    'value'   => $path2_x,
+                    'compare' => 'LIKE',
+                    'key'     => '_wp_attachment_metadata',
+                ),
+
+                'amazonS3_info' => array(
+                    'value'   => $path,
+                    'compare' => 'LIKE',
+                    'key'     => 'amazonS3_info',
+                ),
+                array(
+                    'value'   => $path2,
+                    'compare' => 'LIKE',
+                    'key'     => 'amazonS3_info',
+                ),
+                array(
+                    'value'   => $path_x,
+                    'compare' => 'LIKE',
+                    'key'     => 'amazonS3_info',
+                ),
+                array(
+                    'value'   => $path2_x,
+                    'compare' => 'LIKE',
+                    'key'     => 'amazonS3_info',
+                ),
+            ),
+            'orderby' => 'amazonS3_info'
+        );
 
         $query = new WP_Query( $query_args );
         $file = basename($path);
