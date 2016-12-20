@@ -9,6 +9,10 @@
                 echo '<h2>Grab images</h2> <p>Images are being grabbed !</p>';
                 break;
 
+            case 'feature':
+                echo '<h2>Feature images</h2> <p>Updating broken featured images !</p>';
+                break;
+
             case 'download':
                 echo '<h2>Download images</h2> <p>Images are being downloaded !</p>';
                 break;
@@ -36,6 +40,9 @@
     <ul class="nav nav-pills">
         <li class="nav-item">
             <a href="?page=grab-image&amp;action=grab" class="nav-link <?php echo ($action == 'grab' ? 'active' : ''); ?>">Grab images</a>
+        </li>
+        <li class="nav-item">
+            <a href="?page=grab-image&amp;action=feature" class="nav-link <?php echo ($action == 'feature' ? 'active' : ''); ?>">Feature images</a>
         </li>
         <li class="nav-item">
             <a href="?page=grab-image&amp;action=download" class="nav-link <?php echo ($action == 'download' ? 'active' : ''); ?>">Download images</a>
@@ -92,6 +99,7 @@ if (isset($_GET['action']) && !empty($_GET['action'])) {
     $action = trim($_GET['action']);
     switch ($action) {
         case 'grab':
+        case 'feature':
         case 'download':
         case 'attach':
         case 'search':

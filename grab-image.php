@@ -2,7 +2,7 @@
 /**
  * @package grab-image
  * Plugin Name: Grab Image
- * Version: 3.2
+ * Version: 3.3
  * Description: Grab images of img tags are re-uploads them to be located on the site.
  * Author: Niteco
  * Author URI: http://niteco.se/
@@ -18,13 +18,14 @@ ini_set('max_execution_time', 3000);
 error_reporting(E_ERROR);
 
 // start up the engine
-add_action('admin_menu', 'grab_image_page');
-add_action('wp_ajax_download_image', 'ajax_download_image');
-add_action('wp_ajax_grab_image', 'ajax_grab_image_post');
-add_action('wp_ajax_attach_image', 'ajax_attach_image_post');
-add_action('wp_ajax_search_image', 'ajax_search_image_post');
-add_action('wp_ajax_regex_image', 'ajax_regex_image');
-add_action('wp_ajax_recover_image', 'ajax_recover_image_post');
+add_action('admin_menu'             , 'grab_image_page');
+add_action('wp_ajax_grab_image'     , 'ajax_grab_image_post');
+add_action('wp_ajax_feature_image'  , 'ajax_feature_image_post');
+add_action('wp_ajax_download_image' , 'ajax_download_image');
+add_action('wp_ajax_attach_image'   , 'ajax_attach_image_post');
+add_action('wp_ajax_search_image'   , 'ajax_search_image_post');
+add_action('wp_ajax_regex_image'    , 'ajax_regex_image');
+add_action('wp_ajax_recover_image'  , 'ajax_recover_image_post');
 
 // require helper
 require_once dirname(__FILE__) . '/libs/helper.php';
@@ -408,7 +409,7 @@ function ajax_search_image_post()
 
 /**
  * @package grab-image
- * ajax function to recover image for boligcious' images
+ * ajax function to recover images by restoring last revisions
  */
 function ajax_recover_image_post()
 {
@@ -455,4 +456,32 @@ function ajax_recover_image_post()
     }
 
     exit();
+}
+
+/**
+ * @package grab-image
+ * ajax function to update featured image
+ */
+function ajax_feature_image_post()
+{
+    $id = intval($_REQUEST['id']);
+    $post = get_post($id);
+    if (empty($post)) {
+        echo 'Wrong post ID';
+        wp_die();
+    }
+
+    // call helper class
+    $helper = new grabimage_helper();
+
+    // set post thumbnail if not exist
+    $has_thumb = $helper->set_post_thumbnail($post->ID);
+
+    if (!$has_thumb) {
+        echo 'Error, featured image wasn\'t found';
+    } else {
+        echo 'Success, featured image was found';
+    }
+
+    wp_die();
 }
