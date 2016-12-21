@@ -104,6 +104,12 @@ class grabimage_helper
      */
     public function exist_filename($url)
     {
+        $tmp = download_url($url);
+        if (!is_wp_error($tmp)) {
+            @unlink($tmp);
+            return true;
+        }
+
         $tmp = download_url($this->reencode_url($url));
         if (!is_wp_error($tmp)) {
             @unlink($tmp);
@@ -556,9 +562,13 @@ class grabimage_helper
         $file['file'] = $uploads['path']. '/'. $file['name'];
         $filetype = wp_check_filetype($file['file']);
         $file['type'] = $filetype['type'];
-        $file['tmp_name'] = $this->download_url($this->reencode_url($url));
         $file['error'] = 0;
-        $file['url'] = $this->reencode_url($url);
+        $file['tmp_name'] = download_url($url);
+        $file['url'] = $url;
+        if (is_wp_error($file['tmp_name'])) {
+            $file['tmp_name'] = download_url($this->reencode_url($url));
+            $file['url'] = $this->reencode_url($url);
+        }
 
         // check ignore file
         $ignore = false;
