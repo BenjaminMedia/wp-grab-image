@@ -11,7 +11,8 @@ class grabimage_helper
      *
      * @return mixed
      */
-    public function basename($url) {
+    public function basename($url)
+    {
         $temp = explode('/', $url);
 
         return $temp[count($temp) - 1];
@@ -23,11 +24,13 @@ class grabimage_helper
      *
      * @return string
      */
-    public function basepath($url) {
-        $i    = strpos( $url, "/uploads" );
-        $str  = substr( $url, $i + 9);
-
-        return $str;
+    public function basepath($url)
+    {
+        if (strpos($url, "/uploads") !== false) {
+            $i    = strpos( $url, "/uploads" );
+            $url  = substr( $url, $i + 9);
+        }
+        return $url;
     }
 
     /**
@@ -35,7 +38,8 @@ class grabimage_helper
      * @param $url
      * @return string
      */
-    public function reconstruct_url($url) {
+    public function reconstruct_url($url)
+    {
         $url_parts = parse_url($url);
         $constructed_url = $url_parts['scheme'] . '://' . $url_parts['host'] . $url_parts['path'];
 
@@ -47,7 +51,8 @@ class grabimage_helper
      * @param $url
      * @return mixed
      */
-    public function reencode_url($url) {
+    public function reencode_url($url)
+    {
         $temp = explode('/', $url);
         $temp2 = $temp[count($temp) - 1];
         $temp[count($temp) - 1] = urlencode($temp2);
@@ -60,7 +65,8 @@ class grabimage_helper
      * @param $file
      * @return string
      */
-    public function clean_basename($file) {
+    public function clean_basename($file)
+    {
         $path = pathinfo($file);
         if (isset($path['extension'])) {
             $new_filename = preg_replace('/.' . $path['extension'] . '$/', '', $file);
@@ -76,7 +82,8 @@ class grabimage_helper
      *
      * @return string
      */
-    public function clean_basepath($basepath) {
+    public function clean_basepath($basepath)
+    {
         $tmp = explode('/', $basepath);
 
         $file = $tmp[count($tmp) - 1];
@@ -95,13 +102,17 @@ class grabimage_helper
      * @param $url
      * @return bool
      */
-    public function exist_filename($url) {
-        $tmp = download_url($this->reencode_url($url));
-        if (!is_wp_error($tmp)) {
-            @unlink($tmp);
+    public function exist_filename($url)
+    {
+        $headers = get_headers($url, 1);
+        if (stripos($headers[0], "200 OK") !== false && stripos($headers['Content-Type'], "image/") !== false) {
             return true;
         }
-        @unlink($tmp);
+
+        $headers = get_headers($this->reencode_url($url), 1);
+        if (stripos($headers[0], "200 OK") !== false && stripos($headers['Content-Type'], "image/") !== false) {
+            return true;
+        }
 
         return false;
     }
@@ -111,7 +122,8 @@ class grabimage_helper
      * @param $file
      * @return string
      */
-    public function real_filename($file) {
+    public function real_filename($file)
+    {
         // remove size string
         if (preg_match("/^(https?:\/\/.*)\-[0-9]+x[0-9]+\.(jpg|jpeg|png)$/", $file, $m)) {
             $url = $m[1].'.'.$m[2];
@@ -131,7 +143,8 @@ class grabimage_helper
      *
      * @return string
      */
-    public function exclude_size($file) {
+    public function exclude_size($file)
+    {
         // remove size string
         if (preg_match('/^(.*)\-[0-9]+x[0-9]+\.(jpg|jpeg|png)$/', $file, $m)) {
             $file = $m[1].'.'.$m[2];
@@ -141,13 +154,30 @@ class grabimage_helper
     }
 
     /**
+     * get regex string for amazon s3 search
+     * @param $path
+     * @return string
+     */
+    public function get_amazon_s3($path)
+    {
+        $temp = explode('/', $path);
+        if (count($temp) < 4) {
+            array_splice($temp, count($temp) - 1, 0, array('[0-9]*'));
+        } elseif (count($temp) == 4) {
+            $temp[count($temp) - 2] = '[0-9]*';
+        }
+        return implode('/', $temp);
+    }
+
+    /**
      * compare basename of original and current images
      * @param $first
      * @param $second
      *
      * @return bool
      */
-    public function compare_basename($first, $second) {
+    public function compare_basename($first, $second)
+    {
         $first = $this->clean_basename($this->basename(trim($first)));
         $second = $this->clean_basename($this->basename(trim($second)));
 
@@ -161,7 +191,8 @@ class grabimage_helper
      *
      * @return bool
      */
-    public function compare_basepath($first, $second) {
+    public function compare_basepath($first, $second)
+    {
         $first = $this->clean_basepath($this->basepath(trim($first)));
         $second = $this->clean_basepath($this->basepath(trim($second)));
 
@@ -171,9 +202,11 @@ class grabimage_helper
     /**
      * extract all a|img tag from post_content
      * @param $str
+     * @param bool $check_ignore
      * @return array
      */
-    public function extract_image($str, $check_ignore = true) {
+    public function extract_image($str, $check_ignore = true)
+    {
         $a_pattern = "/<a[^>]*>(<img [^><]*\/?>)<\/a>/";
         $img_pattern = "/<img[^>]+>/i";
 
@@ -223,7 +256,8 @@ class grabimage_helper
      *
      * @return int Attachment ID on success, 0 on failure
      */
-    public function get_attachment_id($url, $check_base = false) {
+    public function get_attachment_id($url, $check_base = false)
+    {
         $attachment_id = 0;
 
         if ($check_base) {
@@ -237,9 +271,9 @@ class grabimage_helper
         $path = $this->basepath($url);
         $attachment_id = $this->query_attachment_id($path);
 
-        // search basename
+        // else search basename
+        $path = $this->basename($url);
         if (empty($attachment_id)) {
-            $path = $this->basename($url);
             $attachment_id = $this->query_attachment_id($path);
         }
 
@@ -260,12 +294,8 @@ class grabimage_helper
         $path2_x = $this->exclude_size($path2);
 
         // regex search
-        $temp = explode('/', $path);
-        if (count($temp) > 2) { array_splice($temp, count($temp) - 1, 0, array('[0-9]*')); }
-        $path_s = implode('/', $temp);
-        $temp = explode('/', $path2);
-        if (count($temp) > 2) { array_splice($temp, count($temp) - 1, 0, array('[0-9]*')); }
-        $path2_s = implode('/', $temp);
+        $path_s = $this->get_amazon_s3($path);
+        $path2_s = $this->get_amazon_s3($path2);
 
         // file
         $file = basename($path);
@@ -279,6 +309,11 @@ class grabimage_helper
                 'relation' => 'OR',
                 array(
                     'value'   => $wpdb->_escape($path),
+                    'compare' => 'LIKE',
+                    'key'     => 'amazonS3_info',
+                ),
+                array(
+                    'value'   => $path,
                     'compare' => 'LIKE',
                     'key'     => 'amazonS3_info',
                 ),
@@ -328,53 +363,70 @@ class grabimage_helper
             }
         }
 
-        if (empty($attachment_id)) {
-            $query_args = array(
-                'post_type'   => 'attachment',
-                'post_status' => 'inherit',
-                'fields'      => 'ids',
-                'meta_query'  => array(
-                    'relation' => 'OR',
-                    array(
-                        'value'   => $path,
-                        'compare' => 'LIKE',
-                        'key'     => '_wp_attachment_metadata',
-                    ),
-                    array(
-                        'value'   => $path2,
-                        'compare' => 'LIKE',
-                        'key'     => '_wp_attachment_metadata',
-                    ),
-                    array(
-                        'value'   => $path_x,
-                        'compare' => 'LIKE',
-                        'key'     => '_wp_attachment_metadata',
-                    ),
-                    array(
-                        'value'   => $path2_x,
-                        'compare' => 'LIKE',
-                        'key'     => '_wp_attachment_metadata',
-                    ),
-                ),
-            );
+        $thumbnail_url = wp_get_attachment_image_url($attachment_id, 'full');
+        if ($this->exist_filename($thumbnail_url)) {
+            return $attachment_id;
+        } else {
+            $attachment_id = 0;
+        }
 
-            $query = new WP_Query( $query_args );
-            if ( $query->have_posts() ) {
-                foreach ( $query->posts as $post_id ) {
-                    $meta = wp_get_attachment_metadata( $post_id );
-                    $original_file       = basename( $meta['file'] );
-                    $cropped_image_files = wp_list_pluck( $meta['sizes'], 'file' );
-                    if (
-                        $file == $original_file
-                        ||  in_array($file , $cropped_image_files)
-                        ||  $file2 == $original_file
-                        ||  in_array($file2 , $cropped_image_files)
-                    ) {
-                        $attachment_id = $post_id;
-                        break;
-                    }
+        $query_args = array(
+            'post_type'   => 'attachment',
+            'post_status' => 'inherit',
+            'fields'      => 'ids',
+            'meta_query'  => array(
+                'relation' => 'OR',
+                array(
+                    'value'   => $wpdb->_escape($path),
+                    'compare' => 'LIKE',
+                    'key'     => '_wp_attachment_metadata',
+                ),
+                array(
+                    'value'   => $path,
+                    'compare' => 'LIKE',
+                    'key'     => '_wp_attachment_metadata',
+                ),
+                array(
+                    'value'   => $path2,
+                    'compare' => 'LIKE',
+                    'key'     => '_wp_attachment_metadata',
+                ),
+                array(
+                    'value'   => $path_x,
+                    'compare' => 'LIKE',
+                    'key'     => '_wp_attachment_metadata',
+                ),
+                array(
+                    'value'   => $path2_x,
+                    'compare' => 'LIKE',
+                    'key'     => '_wp_attachment_metadata',
+                ),
+            ),
+        );
+
+        $query = new WP_Query( $query_args );
+        if ( $query->have_posts() ) {
+            foreach ( $query->posts as $post_id ) {
+                $meta = wp_get_attachment_metadata( $post_id );
+                $original_file       = basename( $meta['file'] );
+                $cropped_image_files = wp_list_pluck( $meta['sizes'], 'file' );
+                if (
+                    $file == $original_file
+                    ||  in_array($file , $cropped_image_files)
+                    ||  $file2 == $original_file
+                    ||  in_array($file2 , $cropped_image_files)
+                ) {
+                    $attachment_id = $post_id;
+                    break;
                 }
             }
+        }
+
+        $thumbnail_url = wp_get_attachment_image_url($attachment_id, 'full');
+        if ($this->exist_filename($thumbnail_url)) {
+            return $attachment_id;
+        } else {
+            $attachment_id = 0;
         }
 
         return $attachment_id;
@@ -387,7 +439,8 @@ class grabimage_helper
      *
      * @return bool
      */
-    public function set_post_thumbnail($id) {
+    public function set_post_thumbnail($id)
+    {
         $post = get_post($id);
         $thumbnail_url = get_the_post_thumbnail_url($id, 'full');
         $has_thumb = false;
@@ -429,8 +482,9 @@ class grabimage_helper
      *
      * @return string|WP_Error
      */
-    public function download_url( $url) {
-        //WARNING: The file is not automatically deleted, The script must unlink() the file.
+    public function download_url( $url)
+    {
+        // WARNING: The file is not automatically deleted, The script must unlink() the file.
         if (! $url)
             return new WP_Error('http_no_url', __('Invalid URL Provided.'));
 
@@ -487,7 +541,8 @@ class grabimage_helper
      *
      * @return bool|int|object
      */
-    public function media_download_sideload($url, $post_id) {
+    public function media_download_sideload($url, $post_id)
+    {
         $post = get_post($post_id);
 
         // check file exist on hard disk or not
@@ -504,9 +559,13 @@ class grabimage_helper
         $file['file'] = $uploads['path']. '/'. $file['name'];
         $filetype = wp_check_filetype($file['file']);
         $file['type'] = $filetype['type'];
-        $file['tmp_name'] = $this->download_url($this->reencode_url($url));
         $file['error'] = 0;
-        $file['url'] = $this->reencode_url($url);
+        $file['tmp_name'] = download_url($url);
+        $file['url'] = $url;
+        if (is_wp_error($file['tmp_name'])) {
+            $file['tmp_name'] = download_url($this->reencode_url($url));
+            $file['url'] = $this->reencode_url($url);
+        }
 
         // check ignore file
         $ignore = false;
@@ -545,7 +604,8 @@ class grabimage_helper
      *
      * @return int
      */
-    public function media_update_sideload($url, $post_id) {
+    public function media_update_sideload($url, $post_id)
+    {
         $post = get_post($post_id);
 
         // check file exist on hard disk or not
@@ -606,7 +666,8 @@ class grabimage_helper
      *
      * @return string
      */
-    public function get_original_image_url( $url, $original_host ) {
+    public function get_original_image_url( $url, $original_host )
+    {
         $i    = strpos( $url, "/uploads" );
         $part = substr( $url, $i );
         $return = $original_host . $part;
@@ -621,14 +682,16 @@ class grabimage_helper
      *
      * @return string
      */
-    public function get_original_post_url($url, $original_host) {
+    public function get_original_post_url($url, $original_host)
+    {
         $home_url = get_home_url();
         $return = $original_host . str_replace($home_url, '', $url);
 
         return $return;
     }
 
-    public function media_download($url) {
+    public function media_download($url)
+    {
         preg_match('/uploads\/([0-9]*)\/([0-9]*)\/[0-9]*\/(.*)/', $url, $m);
 
         $dir = get_home_path(). "/wp-content/uploads/{$m[1]}/{$m[2]}";
@@ -671,7 +734,8 @@ global $wp_version;
 if($wp_version < "4.4")
 {
     if (!function_exists('get_the_post_thumbnail_url')) {
-        function get_the_post_thumbnail_url( $post = null, $size = 'post-thumbnail' ) {
+        function get_the_post_thumbnail_url( $post = null, $size = 'post-thumbnail' )
+        {
             $post_thumbnail_id = get_post_thumbnail_id( $post );
             if ( ! $post_thumbnail_id ) {
                 return false;
@@ -681,7 +745,8 @@ if($wp_version < "4.4")
     }
 
     if (!function_exists('wp_get_attachment_image_url')) {
-        function wp_get_attachment_image_url( $attachment_id, $size = 'thumbnail', $icon = false ) {
+        function wp_get_attachment_image_url( $attachment_id, $size = 'thumbnail', $icon = false )
+        {
             $image = wp_get_attachment_image_src( $attachment_id, $size, $icon );
             return isset( $image['0'] ) ? $image['0'] : false;
         }
