@@ -104,18 +104,15 @@ class grabimage_helper
      */
     public function exist_filename($url)
     {
-        $tmp = download_url($url);
-        if (!is_wp_error($tmp)) {
-            @unlink($tmp);
+        $headers = get_headers($url, 1);
+        if (stripos($headers[0], "200 OK") !== false && stripos($headers['Content-Type'], "image/") !== false) {
             return true;
         }
 
-        $tmp = download_url($this->reencode_url($url));
-        if (!is_wp_error($tmp)) {
-            @unlink($tmp);
+        $headers = get_headers($this->reencode_url($url), 1);
+        if (stripos($headers[0], "200 OK") !== false && stripos($headers['Content-Type'], "image/") !== false) {
             return true;
         }
-        @unlink($tmp);
 
         return false;
     }
