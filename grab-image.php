@@ -2,7 +2,7 @@
 /**
  * @package grab-image
  * Plugin Name: Grab Image
- * Version: 3.3
+ * Version: 3.4
  * Description: Grab images of img tags are re-uploads them to be located on the site.
  * Author: Niteco
  * Author URI: http://niteco.se/
@@ -28,7 +28,7 @@ add_action('wp_ajax_regex_image'    , 'ajax_regex_image');
 add_action('wp_ajax_recover_image'  , 'ajax_recover_image_post');
 
 // require helper
-require_once dirname(__FILE__) . '/libs/helper.php';
+require_once __DIR__ . '/libs/helper.php';
 
 // trigger save_post
 function grab_image_save_post($post_id)
@@ -81,7 +81,7 @@ function grab_image_run()
     if (!current_user_can('manage_options')) {
         wp_die(__('You do not have sufficient permissions to access this page.'));
     } else {
-        require_once dirname(__FILE__) . '/views/page.php';
+        require_once __DIR__ . '/views/page.php';
     }
 }
 
@@ -91,7 +91,7 @@ function grab_image_run()
  */
 function ajax_download_image()
 {
-    $id = intval($_REQUEST['id']);
+    $id = (int) $_REQUEST['id'];
     $post = get_post($id);
     if (empty($post)) {
         echo 'Wrong post ID';
@@ -105,16 +105,16 @@ function ajax_download_image()
     } else {
         $helper = new grabimage_helper();
         echo "<a href='$full_url' target='_blank'>$full_url</a>";
+        $attachment_metadata = wp_get_attachment_metadata($id);
 
-        $sizes = array(
-            'full',
-            'large',
-            'medium',
-            'thumbnail'
-        );
-        // download attachment
-        foreach ($sizes as $size) {
-            echo '<br/>' . ucfirst($size) . ' size,';
+        // download full size
+        echo '<br/>full size, ';
+        $url = wp_get_attachment_image_url($id, 'full');
+        $helper->media_download($url);
+
+        // download attachment 's size
+        foreach ($attachment_metadata['sizes'] as $size => $data) {
+            echo '<br/>'. $size. ' size, ';
             $url = wp_get_attachment_image_url($id, $size);
             $helper->media_download($url);
         }
@@ -129,7 +129,7 @@ function ajax_download_image()
  */
 function ajax_regex_image()
 {
-    $id = intval($_REQUEST['id']);
+    $id = (int) $_REQUEST['id'];
     $post = get_post($id);
     if (empty($post)) {
         echo 'Wrong post ID';
@@ -137,19 +137,22 @@ function ajax_regex_image()
     }
 
     $content = $post->post_content;
-    $pattern = '/"http:\/\/wp-uploads.interactives.dk\/(.*?)\/uploads\/([0-9]*)\/([0-9]*)\/[0-9]*\/(.[^"]*)"/';
+    $pattern = '/http:\/\/wp-uploads.interactives.dk\/(.*?)\/uploads\/([0-9]*)\/([0-9]*)\/[0-9]*\/(.[^"]*)/';
     preg_match_all($pattern, $content, $matches);
 
     $search = $replace = array();
     foreach ($matches[0] as $i => $match) {
         if (!in_array($match, $search)) {
-            $search[] = $match;
-            $link = home_url() . "/wp-content/uploads/{$matches[2][$i]}/{$matches[3][$i]}/{$matches[4][$i]}";
-            $replace[] = '"' . $link . '"';
+            $image = "/wp-content/uploads/{$matches[2][$i]}/{$matches[3][$i]}/{$matches[4][$i]}";
+            if (file_exists(get_home_path(). $image)) {
+                $search[] = $match;
+                $url = home_url(). $image;
+                $replace[] = $url;
 
-            // print to browser
-            echo "<a href='{$link}' target='_blank'>{$link}</a>";
-            echo "<br/>";
+                // print to browser
+                echo "<a href='{$url}' target='_blank'>{$url}</a>";
+                echo "<br/>";
+            }
         }
     }
 
@@ -181,7 +184,7 @@ function ajax_regex_image()
  */
 function ajax_grab_image_post($trigger = false)
 {
-    $id = intval($_REQUEST['id']);
+    $id = (int) $_REQUEST['id'];
     $post = get_post($id);
     if (empty($post)) {
         echo 'Wrong post ID';
@@ -287,7 +290,7 @@ function ajax_grab_image_post($trigger = false)
  */
 function ajax_attach_image_post()
 {
-    $id = intval($_REQUEST['id']);
+    $id = (int) $_REQUEST['id'];
     $post = get_post($id);
     if (empty($post)) {
         echo 'Wrong post ID';
@@ -360,7 +363,7 @@ function ajax_attach_image_post()
  */
 function ajax_search_image_post()
 {
-    $id = intval($_REQUEST['id']);
+    $id = (int) $_REQUEST['id'];
     $post = get_post($id);
     if (empty($post)) {
         echo 'Wrong post ID';
@@ -413,7 +416,7 @@ function ajax_search_image_post()
  */
 function ajax_recover_image_post()
 {
-    $post_id = intval($_REQUEST['id']);
+    $post_id = (int) $_REQUEST['id'];
     $post = get_post($post_id);
     if (empty($post)) {
         echo 'Wrong post ID';
@@ -464,7 +467,7 @@ function ajax_recover_image_post()
  */
 function ajax_feature_image_post()
 {
-    $id = intval($_REQUEST['id']);
+    $id = (int) $_REQUEST['id'];
     $post = get_post($id);
     if (empty($post)) {
         echo 'Wrong post ID';
