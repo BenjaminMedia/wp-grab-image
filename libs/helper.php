@@ -694,6 +694,7 @@ class grabimage_helper
     {
         preg_match('/uploads\/([0-9]*)\/([0-9]*)\/[0-9]*\/(.*)/', $url, $m);
 
+        $m[3] = urldecode($m[3]);
         $dir = get_home_path(). "/wp-content/uploads/{$m[1]}/{$m[2]}";
         $file = get_home_path(). "/wp-content/uploads/{$m[1]}/{$m[2]}/{$m[3]}";
         $link = home_url(). "/wp-content/uploads/{$m[1]}/{$m[2]}/{$m[3]}";;
