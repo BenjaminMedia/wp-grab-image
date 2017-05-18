@@ -2,7 +2,7 @@
 /**
  * @package grab-image
  * Plugin Name: Grab Image
- * Version: 3.5
+ * Version: 3.6
  * Description: Grab images of img tags are re-uploads them to be located on the site.
  * Author: Niteco
  * Author URI: http://niteco.se/
@@ -144,7 +144,9 @@ function ajax_regex_image()
     foreach ($matches[0] as $i => $match) {
         if (!in_array($match, $search)) {
             $image = "/wp-content/uploads/{$matches[2][$i]}/{$matches[3][$i]}/{$matches[4][$i]}";
-            if (file_exists(get_home_path(). $image)) {
+            $matches[4][$i] = urldecode($matches[4][$i]);
+            $image2 = "/wp-content/uploads/{$matches[2][$i]}/{$matches[3][$i]}/{$matches[4][$i]}";
+            if (file_exists(get_home_path(). $image) || file_exists(get_home_path(). $image2)) {
                 $search[] = $match;
                 $url = home_url(). $image;
                 $replace[] = $url;
